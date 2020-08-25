@@ -1,7 +1,8 @@
+use rmp_serde::{from_read_ref, Serializer};
 use serde::{de::DeserializeOwned, Serialize};
 use ulid::Ulid;
 
-use crate::error::Result;
+use crate::error::{Error, InternalError, Result};
 
 pub trait Graph {
     type WriteTransaction: ReadTransaction;
@@ -12,6 +13,18 @@ pub trait Graph {
 }
 
 pub type LogId = Ulid;
+
+pub trait FromDB<T> {
+    fn from_db(key: impl Into<String>, data: &[u8]) -> Result<Self>
+    where
+        Self: Sized,
+        T: DeserializeOwned;
+}
+
+pub trait ToDB {
+    fn to_db(&self) -> Result<Vec<u8>>;
+    fn key(&self) -> Result<String>;
+}
 
 #[derive(Debug, PartialEq, Clone)]
 pub struct Node<T> {
@@ -37,17 +50,56 @@ impl<T: Serialize + DeserializeOwned + Clone> Node<T> {
     }
 }
 
+impl<T> FromDB<T> for Node<T> {
+    fn from_db(key: impl Into<String>, data: &[u8]) -> Result<Self>
+    where
+        Self: Sized,
+        T: DeserializeOwned,
+    {
+        let (type_name, value) = from_read_ref::<[u8], (String, T)>(data)?;
+        Ok(Self {
+            id: Some(Ulid::from_string(&key.into())?),
+            next_id: None,
+            type_name,
+            value,
+        })
+    }
+}
+
+impl<T> ToDB for Node<T>
+where
+    T: Serialize,
+{
+    fn to_db(&self) -> Result<Vec<u8>> {
+        let mut buf = Vec::new();
+        (&self.type_name, &self.value).serialize(&mut Serializer::new(&mut buf))?;
+        Ok(buf)
+    }
+    fn key(&self) -> Result<String> {
+        self.id
+            .map(|u| u.to_string())
+            .ok_or(Error::Internal(InternalError::BadWrite))
+    }
+}
+
 pub trait WriteTransaction {
     type Graph;
 
-    fn put_node<T: Clone + Serialize + DeserializeOwned>(&mut self, n: Node<T>) -> Result<Node<T>>;
+    fn put_node<T>(&mut self, n: Node<T>) -> Result<Node<T>>
+    where
+        T: Clone + Serialize + DeserializeOwned;
     fn commit(self) -> Result<()>;
 }
 
 pub trait ReadTransaction {
     type Graph;
 
-    fn get_node<T: Clone + DeserializeOwned + Serialize>(&self, id: LogId) -> Result<Node<T>>;
+    fn get_node<T>(&self, id: LogId) -> Result<Option<Node<T>>>
+    where
+        T: Clone + DeserializeOwned + Serialize;
+    fn get_node_by_value<T>(&self, n: &Node<T>) -> Result<Option<Node<T>>>
+    where
+        T: Clone + DeserializeOwned + Serialize;
 }
 
 #[cfg(test)]

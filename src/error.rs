@@ -1,5 +1,7 @@
 use lmdb_zero;
 use rmp_serde::{decode, encode};
+use ulid::DecodeError;
+
 use std::io;
 use std::result;
 
@@ -13,6 +15,7 @@ pub enum Error {
 
     Encode(encode::Error),
     Decode(decode::Error),
+    Ulid(DecodeError),
     Internal(InternalError),
 }
 
@@ -44,5 +47,11 @@ impl From<lmdb_zero::error::Error> for Error {
 impl From<io::Error> for Error {
     fn from(e: io::Error) -> Self {
         Self::Internal(InternalError::IoError(e))
+    }
+}
+
+impl From<DecodeError> for Error {
+    fn from(e: DecodeError) -> Self {
+        Self::Ulid(e)
     }
 }

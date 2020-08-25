@@ -1,16 +1,15 @@
 use lmdb_zero::{
-    db, open, put, Database, DatabaseOptions, EnvBuilder, Environment, ReadTransaction as RTrans,
-    WriteTransaction as WTrans,
+    db, error::Error as LmdbError, open, put, ConstTransaction, Database, DatabaseOptions,
+    EnvBuilder, Environment, ReadTransaction as RTrans, WriteTransaction as WTrans,
 };
-use rmp_serde::{from_read_ref, Serializer};
 use serde::{de::DeserializeOwned, Serialize};
 use ulid::Ulid;
 
 use std::sync::Arc;
 
 use crate::{
-    error::Result,
-    graph::{Graph, LogId, Node, ReadTransaction, WriteTransaction},
+    error::{Error, Result},
+    graph::{FromDB, Graph, LogId, Node, ReadTransaction, ToDB, WriteTransaction},
 };
 
 const DEFAULT_PERMISSIONS: u32 = 0o600;
@@ -19,6 +18,7 @@ const DEFAULT_PERMISSIONS: u32 = 0o600;
 pub struct LmdbGraph<'a> {
     env: Arc<Environment>,
     node_db: Arc<Database<'a>>,
+    node_idx_db: Arc<Database<'a>>,
 }
 
 impl<'a> LmdbGraph<'a> {
@@ -28,10 +28,19 @@ impl<'a> LmdbGraph<'a> {
         let env = Arc::new(builder.open(path, open::Flags::empty(), DEFAULT_PERMISSIONS)?);
         let node_db = Arc::new(Database::open(
             env.clone(),
-            Some("nodes"),
+            Some("nodes:v1"),
             &DatabaseOptions::new(db::CREATE),
         )?);
-        Ok(Self { env, node_db })
+        let node_idx_db = Arc::new(Database::open(
+            env.clone(),
+            Some("rev_nodes:v1"),
+            &DatabaseOptions::new(db::CREATE),
+        )?);
+        Ok(Self {
+            env,
+            node_db,
+            node_idx_db,
+        })
     }
 }
 
@@ -42,6 +51,7 @@ impl<'graph> Graph for LmdbGraph<'graph> {
     fn write_transaction(&mut self) -> Result<Self::WriteTransaction> {
         Ok(LmdbWriteTransaction {
             node_db: self.node_db.clone(),
+            node_idx_db: self.node_idx_db.clone(),
             txn: WTrans::new(self.env.clone())?,
         })
     }
@@ -49,6 +59,7 @@ impl<'graph> Graph for LmdbGraph<'graph> {
     fn read_transaction(&self) -> Result<Self::ReadTransaction> {
         Ok(LmdbReadTransaction {
             node_db: self.node_db.clone(),
+            node_idx_db: self.node_idx_db.clone(),
             txn: RTrans::new(self.env.clone())?,
         })
     }
@@ -56,25 +67,25 @@ impl<'graph> Graph for LmdbGraph<'graph> {
 
 pub struct LmdbWriteTransaction<'graph> {
     node_db: Arc<Database<'graph>>,
+    node_idx_db: Arc<Database<'graph>>,
     txn: WTrans<'graph>,
 }
 
 impl<'graph> ReadTransaction for LmdbWriteTransaction<'graph> {
     type Graph = LmdbGraph<'graph>;
 
-    fn get_node<T>(&self, id: LogId) -> Result<Node<T>>
+    fn get_node<T>(&self, id: LogId) -> Result<Option<Node<T>>>
     where
         T: Clone + Serialize + DeserializeOwned,
     {
-        let access = self.txn.access();
-        let buf = access.get::<str, [u8]>(&self.node_db, &id.to_string())?;
-        let (type_name, value) = from_read_ref(&buf)?;
-        Ok(Node {
-            id: Some(id),
-            next_id: None,
-            type_name,
-            value,
-        })
+        LmdbReadTransaction::_get_node(&self.txn, self.node_db.clone(), id)
+    }
+
+    fn get_node_by_value<T>(&self, n: &Node<T>) -> Result<Option<Node<T>>>
+    where
+        T: Clone + DeserializeOwned + Serialize,
+    {
+        LmdbReadTransaction::_get_node_by_value(&self.txn, self.node_idx_db.clone(), n)
     }
 }
 
@@ -87,12 +98,17 @@ impl<'a> WriteTransaction for LmdbWriteTransaction<'a> {
     {
         let id = Ulid::new();
         let mut access = self.txn.access();
-        let mut buf = Vec::new();
-        (&n.type_name, &n.value).serialize(&mut Serializer::new(&mut buf))?;
+        let buf = n.to_db()?;
         access.put(
             &self.node_db,
             id.to_string().as_str(),
             &buf,
+            put::Flags::empty(),
+        )?;
+        access.put(
+            &self.node_idx_db,
+            &buf,
+            id.to_string().as_str(),
             put::Flags::empty(),
         )?;
         let node = Node { id: Some(id), ..n };
@@ -106,25 +122,68 @@ impl<'a> WriteTransaction for LmdbWriteTransaction<'a> {
 
 pub struct LmdbReadTransaction<'graph> {
     node_db: Arc<Database<'graph>>,
+    node_idx_db: Arc<Database<'graph>>,
     txn: RTrans<'graph>,
+}
+
+impl<'graph> LmdbReadTransaction<'graph> {
+    fn _get_node<T>(
+        txn: &ConstTransaction,
+        db: Arc<Database<'graph>>,
+        id: LogId,
+    ) -> Result<Option<Node<T>>>
+    where
+        T: Clone + Serialize + DeserializeOwned,
+    {
+        let access = txn.access();
+        let buf: Result<&[u8]> = match access.get::<str, [u8]>(&db, &id.to_string()) {
+            Ok(buf) => Ok(buf),
+            Err(LmdbError::Code(lmdb_zero::error::NOTFOUND)) => return Ok(None),
+            Err(e) => Err(Error::from(e)),
+        };
+        let node = Node::from_db(id, &buf?);
+        node.map(Option::Some)
+    }
+
+    fn _get_node_by_value<T>(
+        txn: &ConstTransaction,
+        db: Arc<Database<'graph>>,
+        n: &Node<T>,
+    ) -> Result<Option<Node<T>>>
+    where
+        T: Clone + DeserializeOwned + Serialize,
+    {
+        let access = txn.access();
+        let buf: Result<&str> = match access.get::<[u8], str>(&db, &n.to_db()?) {
+            Ok(buf) => Ok(buf),
+            Err(LmdbError::Code(lmdb_zero::error::NOTFOUND)) => return Ok(None),
+            Err(e) => Err(Error::from(e)),
+        };
+        let id = Ulid::from_string(buf?)?;
+        Ok(Some(Node {
+            id: Some(id),
+            next_id: None,
+            type_name: n.type_name.clone(),
+            value: n.value.clone(),
+        }))
+    }
 }
 
 impl<'graph> ReadTransaction for LmdbReadTransaction<'graph> {
     type Graph = LmdbGraph<'graph>;
 
-    fn get_node<T>(&self, id: LogId) -> Result<Node<T>>
+    fn get_node<T>(&self, id: LogId) -> Result<Option<Node<T>>>
     where
         T: Clone + Serialize + DeserializeOwned,
     {
-        let access = self.txn.access();
-        let buf = access.get::<str, [u8]>(&self.node_db, &id.to_string())?;
-        let (type_name, value) = from_read_ref(&buf)?;
-        Ok(Node {
-            id: Some(id),
-            next_id: None,
-            type_name,
-            value,
-        })
+        Self::_get_node(&self.txn, self.node_db.clone(), id)
+    }
+
+    fn get_node_by_value<T>(&self, n: &Node<T>) -> Result<Option<Node<T>>>
+    where
+        T: Clone + DeserializeOwned + Serialize,
+    {
+        Self::_get_node_by_value(&self.txn, self.node_idx_db.clone(), n)
     }
 }
 
@@ -162,10 +221,56 @@ mod tests {
         assert_eq!(returned.get_value(), node.get_value());
         let txn = graph.read_transaction()?;
 
-        let fetched = txn.get_node::<String>(returned.id.unwrap())?;
+        let fetched = txn.get_node::<String>(returned.id.unwrap())?.unwrap();
         assert_eq!(fetched.id, returned.id);
         assert_eq!(fetched.type_name, returned.type_name);
         assert_eq!(fetched.get_value(), returned.get_value());
+
+        tmpdir.close()?;
+        Ok(())
+    }
+
+    #[test]
+    fn node_not_exist() -> Result<()> {
+        let tmpdir = TempDir::new("test")?;
+        let graph = unsafe { LmdbGraph::new(tmpdir.path().to_str().unwrap()) }?;
+
+        let txn = graph.read_transaction()?;
+        let id = Ulid::new();
+        let ret = txn.get_node::<String>(id);
+        match ret {
+            Ok(n) => assert!(n.is_none()),
+            Err(e) => panic!("Wrong error {:?}", e),
+        }
+        tmpdir.close()?;
+        Ok(())
+    }
+
+    #[test]
+    fn node_reverse_lookup() -> Result<()> {
+        let tmpdir = TempDir::new("test")?;
+        let mut graph = unsafe { LmdbGraph::new(tmpdir.path().to_str().unwrap()) }?;
+
+        let name = "Kevin".to_string();
+        let node = Node::new("name", name)?;
+
+        let mut txn = graph.write_transaction()?;
+        let put = txn.put_node(node.clone())?;
+        // Put some more to make sure writes don't affect things
+        let charles = txn.put_node(Node::new("name", "Charles".to_string())?)?;
+        txn.put_node(Node::new("name", "James".to_string())?)?;
+        txn.put_node(Node::new("name", "Isabella".to_string())?)?;
+        txn.commit()?;
+        assert!(put.id.is_some());
+
+        let txn = graph.read_transaction()?;
+        let fetched = txn.get_node_by_value(&node)?;
+        assert!(fetched.is_some());
+        let fetched = fetched.unwrap();
+        assert_eq!(fetched.id, put.id);
+        let charles_ret = txn.get_node_by_value(&Node::new("name", "Charles".to_string())?)?;
+        assert!(charles_ret.is_some());
+        assert_eq!(charles.id, charles_ret.unwrap().id);
 
         tmpdir.close()?;
         Ok(())
