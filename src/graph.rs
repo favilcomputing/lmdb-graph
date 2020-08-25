@@ -30,7 +30,6 @@ pub trait ToDB {
 pub struct Node<T> {
     pub(crate) id: Option<LogId>,
 
-    pub(crate) next_id: Option<LogId>,
     pub(crate) type_name: String,
     pub(crate) value: T,
 }
@@ -39,7 +38,6 @@ impl<T: Serialize + DeserializeOwned + Clone> Node<T> {
     pub fn new(type_name: impl Into<String>, value: T) -> Result<Self> {
         Ok(Self {
             id: None,
-            next_id: None,
             type_name: type_name.into(),
             value,
         })
@@ -59,7 +57,6 @@ impl<T> FromDB<T> for Node<T> {
         let (type_name, value) = from_read_ref::<[u8], (String, T)>(data)?;
         Ok(Self {
             id: Some(Ulid::from_string(&key.into())?),
-            next_id: None,
             type_name,
             value,
         })
@@ -112,7 +109,6 @@ mod tests {
         let node = Node::new("Name", value.clone())?;
         assert_eq!(node.get_value(), value);
         assert_eq!(node.id, None);
-        assert_eq!(node.next_id, None);
         Ok(())
     }
 }

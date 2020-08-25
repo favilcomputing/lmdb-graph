@@ -162,7 +162,6 @@ impl<'graph> LmdbReadTransaction<'graph> {
         let id = Ulid::from_string(buf?)?;
         Ok(Some(Node {
             id: Some(id),
-            next_id: None,
             type_name: n.type_name.clone(),
             value: n.value.clone(),
         }))
