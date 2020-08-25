@@ -4,13 +4,15 @@ An embedded graph database using LMDB
 
 # Building
 
-``` rust
+``` bash
 cargo build 
 ```
 
 
 # Examples
 
-``` rust
+``` bash
+mkdir test.db
+
 cargo run --example hello_world
 ```
