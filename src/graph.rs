@@ -2,113 +2,243 @@ use rmp_serde::{from_read_ref, Serializer};
 use serde::{de::DeserializeOwned, Serialize};
 use ulid::Ulid;
 
-use crate::error::{Error, InternalError, Result};
+use crate::error::Result;
 
 pub trait Graph {
-    type WriteTransaction: ReadTransaction;
-    type ReadTransaction;
+    type ReadT: ReadTransaction;
+    type WriteT: ReadTransaction + WriteTransaction;
 
-    fn write_transaction(&mut self) -> Result<Self::WriteTransaction>;
-    fn read_transaction(&self) -> Result<Self::ReadTransaction>;
+    fn write_transaction(&mut self) -> Result<Self::WriteT>;
+    fn read_transaction(&self) -> Result<Self::ReadT>;
 }
 
 pub type LogId = Ulid;
 
-pub trait FromDB<T> {
-    fn from_db(key: impl Into<String>, data: &[u8]) -> Result<Self>
+pub trait FromDB<Value> {
+    type Key: Serialize + DeserializeOwned;
+
+    fn from_db(key: &Self::Key, data: &[u8]) -> Result<Self>
     where
         Self: Sized,
-        T: DeserializeOwned;
+        Value: DeserializeOwned;
+
+    fn key_from_db(key: &[u8]) -> Result<Self::Key>
+    where
+        Self: Sized,
+        Value: DeserializeOwned;
 }
 
 pub trait ToDB {
+    type Key: Serialize + DeserializeOwned;
+
     fn to_db(&self) -> Result<Vec<u8>>;
-    fn key(&self) -> Result<String>;
+    fn key(&self) -> Result<Vec<u8>>;
+    fn key_to_db(key: &Self::Key) -> Result<Vec<u8>>;
 }
 
 #[derive(Debug, PartialEq, Clone)]
-pub struct Node<T> {
+pub struct Node<Type, Value> {
     pub(crate) id: Option<LogId>,
 
-    pub(crate) type_name: String,
-    pub(crate) value: T,
+    pub(crate) _type: Type,
+    pub(crate) value: Value,
 }
 
-impl<T: Serialize + DeserializeOwned + Clone> Node<T> {
-    pub fn new(type_name: impl Into<String>, value: T) -> Result<Self> {
+impl<Type, Value> Node<Type, Value>
+where
+    Type: Serialize + DeserializeOwned + Clone,
+    Value: Serialize + DeserializeOwned + Clone,
+{
+    pub fn new(_type: Type, value: Value) -> Result<Self> {
         Ok(Self {
             id: None,
-            type_name: type_name.into(),
+            _type,
             value,
         })
     }
 
-    pub fn get_value(&self) -> T {
+    pub fn get_value(&self) -> Value {
         self.value.clone()
     }
 }
 
-impl<T> FromDB<T> for Node<T> {
-    fn from_db(key: impl Into<String>, data: &[u8]) -> Result<Self>
+impl<Type, Value> FromDB<Value> for Node<Type, Value>
+where
+    Type: DeserializeOwned,
+    Value: DeserializeOwned,
+{
+    type Key = LogId;
+
+    fn from_db(key: &Self::Key, data: &[u8]) -> Result<Self>
     where
         Self: Sized,
-        T: DeserializeOwned,
+        Type: DeserializeOwned,
+        Value: DeserializeOwned,
     {
-        let (type_name, value) = from_read_ref::<[u8], (String, T)>(data)?;
+        let (_type, value) = from_read_ref::<[u8], (Type, Value)>(data)?;
         Ok(Self {
-            id: Some(Ulid::from_string(&key.into())?),
-            type_name,
+            id: Some(key.clone()),
+            _type,
             value,
         })
     }
+
+    fn key_from_db(key: &[u8]) -> Result<Self::Key>
+    where
+        Self: Sized,
+        Type: DeserializeOwned,
+        Value: DeserializeOwned,
+    {
+        Ok(from_read_ref::<[u8], Self::Key>(key)?)
+    }
 }
 
-impl<T> ToDB for Node<T>
+impl<Type, Value> ToDB for Node<Type, Value>
 where
-    T: Serialize,
+    Type: Serialize,
+    Value: Serialize,
 {
+    type Key = LogId;
+
     fn to_db(&self) -> Result<Vec<u8>> {
         let mut buf = Vec::new();
-        (&self.type_name, &self.value).serialize(&mut Serializer::new(&mut buf))?;
+        (&self._type, &self.value).serialize(&mut Serializer::new(&mut buf))?;
         Ok(buf)
     }
-    fn key(&self) -> Result<String> {
-        self.id
-            .map(|u| u.to_string())
-            .ok_or(Error::Internal(InternalError::BadWrite))
+
+    fn key(&self) -> Result<Vec<u8>> {
+        let mut buf = Vec::new();
+        self.id.serialize(&mut Serializer::new(&mut buf))?;
+        Ok(buf)
+    }
+
+    fn key_to_db(key: &Self::Key) -> Result<Vec<u8>> {
+        let mut buf = Vec::new();
+        key.serialize(&mut Serializer::new(&mut buf))?;
+        Ok(buf)
     }
 }
 
 pub trait WriteTransaction {
     type Graph;
 
-    fn put_node<T>(&mut self, n: Node<T>) -> Result<Node<T>>
+    fn put_node<Type, Value>(&mut self, n: Node<Type, Value>) -> Result<Node<Type, Value>>
     where
-        T: Clone + Serialize + DeserializeOwned;
+        Type: Clone + Serialize + DeserializeOwned,
+        Value: Clone + Serialize + DeserializeOwned;
+
     fn commit(self) -> Result<()>;
+
+    fn clear(&mut self) -> Result<()>;
 }
 
 pub trait ReadTransaction {
     type Graph;
 
-    fn get_node<T>(&self, id: LogId) -> Result<Option<Node<T>>>
+    fn get_node<Type, Value>(&self, id: LogId) -> Result<Option<Node<Type, Value>>>
     where
-        T: Clone + DeserializeOwned + Serialize;
-    fn get_node_by_value<T>(&self, n: &Node<T>) -> Result<Option<Node<T>>>
+        Type: Clone + DeserializeOwned + Serialize,
+        Value: Clone + DeserializeOwned + Serialize;
+    fn get_node_by_value<Type, Value>(
+        &self,
+        n: &Node<Type, Value>,
+    ) -> Result<Option<Node<Type, Value>>>
     where
-        T: Clone + DeserializeOwned + Serialize;
+        Type: Clone + DeserializeOwned + Serialize,
+        Value: Clone + DeserializeOwned + Serialize;
+}
+
+#[derive(Debug, PartialEq, Clone)]
+pub struct Edge<Type, Value> {
+    id: Option<LogId>,
+    to: LogId,
+    from: LogId,
+    _type: Type,
+    value: Value,
+}
+
+impl<Type, Value> Edge<Type, Value> {
+    pub fn new(to: LogId, from: LogId, _type: Type, value: Value) -> Self {
+        Self {
+            id: None,
+            to,
+            from,
+            _type,
+            value,
+        }
+    }
+}
+
+impl<Type, Value> FromDB<Value> for Edge<Type, Value>
+where
+    Type: DeserializeOwned,
+    Value: DeserializeOwned,
+{
+    type Key = (LogId, LogId, LogId);
+
+    fn from_db((id, to, from): &Self::Key, data: &[u8]) -> Result<Self>
+    where
+        Self: Sized,
+        Type: DeserializeOwned,
+        Value: DeserializeOwned,
+    {
+        let (_type, value) = from_read_ref::<[u8], (Type, Value)>(data)?;
+        Ok(Self {
+            id: Some(id.clone()),
+            to: to.clone(),
+            from: from.clone(),
+            _type,
+            value,
+        })
+    }
+
+    fn key_from_db(key: &[u8]) -> Result<Self::Key>
+    where
+        Self: Sized,
+        Type: DeserializeOwned,
+        Value: DeserializeOwned,
+    {
+        Ok(from_read_ref::<[u8], Self::Key>(key)?)
+    }
+}
+
+impl<Type, Value> ToDB for Edge<Type, Value>
+where
+    Type: Serialize,
+    Value: Serialize,
+{
+    type Key = (LogId, LogId, LogId);
+
+    fn to_db(&self) -> Result<Vec<u8>> {
+        let mut buf = Vec::new();
+        (&self._type, &self.value).serialize(&mut Serializer::new(&mut buf))?;
+        Ok(buf)
+    }
+
+    fn key(&self) -> Result<Vec<u8>> {
+        let mut buf = Vec::new();
+        (&self.id, &self.to, &self.from).serialize(&mut Serializer::new(&mut buf))?;
+        Ok(buf)
+    }
+
+    fn key_to_db(key: &Self::Key) -> Result<Vec<u8>> {
+        let mut buf = Vec::new();
+        key.serialize(&mut Serializer::new(&mut buf))?;
+        Ok(buf)
+    }
 }
 
 #[cfg(test)]
 mod tests {
+    use rstest::rstest;
+
     use super::*;
 
-    #[test]
-    fn test_serialize() -> Result<()> {
+    #[rstest]
+    fn test_serialize() {
         let value = "Testing".to_string();
-        let node = Node::new("Name", value.clone())?;
+        let node = Node::new("Name", value.clone()).unwrap();
         assert_eq!(node.get_value(), value);
         assert_eq!(node.id, None);
-        Ok(())
     }
 }
