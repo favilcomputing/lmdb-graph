@@ -225,7 +225,7 @@ mod tests {
     #[rstest]
     fn test_graph(graph: Result<impl Graph>) -> Result<()> {
         let mut graph = graph?;
-        let node = Node::new("Name", "test".to_string()).unwrap();
+        let node = Node::new("Name".to_string(), "test".to_string()).unwrap();
         let mut txn = graph.write_transaction().unwrap();
         let returned = txn.put_node(node.clone()).unwrap();
         assert_eq!(node.id, None);
@@ -239,7 +239,7 @@ mod tests {
     fn test_get_node(graph: Result<impl Graph>) -> Result<()> {
         let mut graph = graph?;
 
-        let node = Node::new("Name", "test".to_string())?;
+        let node = Node::new("Name".to_string(), "test".to_string())?;
         let mut txn = graph.write_transaction()?;
         let returned = txn.put_node(node.clone())?;
         txn.commit()?;
@@ -248,7 +248,7 @@ mod tests {
         assert_eq!(returned.get_value(), node.get_value());
         let txn = graph.read_transaction()?;
 
-        let fetched = txn.get_node::<String>(returned.id.unwrap())?;
+        let fetched = txn.get_node::<String, String>(returned.id.unwrap())?;
         assert!(fetched.is_some());
         let fetched = fetched.unwrap();
         assert_eq!(fetched.id, returned.id);
@@ -264,7 +264,7 @@ mod tests {
 
         let txn = graph.read_transaction()?;
         let id = LogId::new();
-        let ret = txn.get_node::<String>(id);
+        let ret = txn.get_node::<String, String>(id);
         match ret {
             Ok(n) => assert!(n.is_none()),
             Err(e) => panic!("Wrong error {:?}", e),
@@ -277,14 +277,14 @@ mod tests {
         let mut graph = graph?;
 
         let name = "Kevin".to_string();
-        let node = Node::new("name", name)?;
+        let node = Node::new("name".to_string(), name)?;
 
         let mut txn = graph.write_transaction()?;
         let put = txn.put_node(node.clone())?;
         // Put some more to make sure writes don't affect things
-        let charles = txn.put_node(Node::new("name", "Charles".to_string())?)?;
-        txn.put_node(Node::new("name", "James".to_string())?)?;
-        txn.put_node(Node::new("name", "Isabella".to_string())?)?;
+        let charles = txn.put_node(Node::new("name".to_string(), "Charles".to_string())?)?;
+        txn.put_node(Node::new("name".to_string(), "James".to_string())?)?;
+        txn.put_node(Node::new("name".to_string(), "Isabella".to_string())?)?;
         txn.commit()?;
         assert!(put.id.is_some());
 
