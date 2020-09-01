@@ -1,10 +1,10 @@
 use rmp_serde::{from_read_ref, Serializer};
-use serde::{de::DeserializeOwned, Serialize};
+use serde::{de::DeserializeOwned, Deserialize, Serialize};
 
 use super::{FromDB, LogId, ToDB};
 use crate::error::Result;
 
-#[derive(Debug, PartialEq, Clone)]
+#[derive(Debug, PartialEq, Clone, Serialize, Deserialize)]
 pub struct Node<Type, Value> {
     pub(crate) id: Option<LogId>,
 
@@ -28,6 +28,10 @@ where
     pub fn get_value(&self) -> Value {
         self.value.clone()
     }
+
+    pub fn get_id(&self) -> Option<LogId> {
+        self.id
+    }
 }
 
 impl<Type, Value> FromDB<Value> for Node<Type, Value>
@@ -43,11 +47,10 @@ where
         Type: DeserializeOwned,
         Value: DeserializeOwned,
     {
-        let (_type, value) = from_read_ref::<[u8], (Type, Value)>(data)?;
+        let node = from_read_ref::<[u8], Self>(data)?;
         Ok(Self {
             id: Some(key.clone()),
-            _type,
-            value,
+            ..node
         })
     }
 
@@ -69,6 +72,12 @@ where
     type Key = LogId;
 
     fn to_db(&self) -> Result<Vec<u8>> {
+        let mut buf = Vec::new();
+        self.serialize(&mut Serializer::new(&mut buf))?;
+        Ok(buf)
+    }
+
+    fn value_to_db(&self) -> Result<Vec<u8>> {
         let mut buf = Vec::new();
         (&self._type, &self.value).serialize(&mut Serializer::new(&mut buf))?;
         Ok(buf)
