@@ -17,6 +17,7 @@ pub enum Error {
     Decode(decode::Error),
     Ulid(DecodeError),
     Internal(InternalError),
+    UsedArc,
 }
 
 #[derive(Debug)]

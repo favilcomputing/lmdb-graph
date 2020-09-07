@@ -148,7 +148,10 @@ mod tests {
         )?;
         edge.id = Some(LogId::nil());
         assert_eq!(edge.get_value(), value);
-        assert_eq!(Edge::<String, String>::from_db(&LogId::nil(), edge.to_db()?.as_slice())?, edge);
+        assert_eq!(
+            Edge::<String, String>::from_db(&LogId::nil(), edge.to_db()?.as_slice())?,
+            edge
+        );
         Ok(())
     }
 }

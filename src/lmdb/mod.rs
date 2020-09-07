@@ -13,16 +13,16 @@ use crate::{error::Result, graph::Graph};
 const DEFAULT_PERMISSIONS: u32 = 0o600;
 
 #[derive(Debug)]
-pub struct LmdbGraph<'a> {
+pub struct LmdbGraph<'db> {
     pub(crate) env: Arc<Environment>,
-    pub(crate) node_db: Arc<Database<'a>>,
-    pub(crate) node_idx_db: Arc<Database<'a>>,
-    pub(crate) edge_db: Arc<Database<'a>>,
-    pub(crate) edge_idx_db: Arc<Database<'a>>,
-    pub(crate) hexstore_db: Arc<Database<'a>>,
+    pub(crate) node_db: Arc<Database<'db>>,
+    pub(crate) node_idx_db: Arc<Database<'db>>,
+    pub(crate) edge_db: Arc<Database<'db>>,
+    pub(crate) edge_idx_db: Arc<Database<'db>>,
+    pub(crate) hexstore_db: Arc<Database<'db>>,
 }
 
-impl<'a> LmdbGraph<'a> {
+impl<'db> LmdbGraph<'db> {
     pub unsafe fn new(path: &str) -> Result<Self> {
         let mut builder = EnvBuilder::new()?;
         builder.set_maxdbs(10)?;
@@ -63,11 +63,12 @@ impl<'a> LmdbGraph<'a> {
     }
 }
 
-impl<'graph> Graph for LmdbGraph<'graph> {
-    type WriteT = LmdbWriteTransaction<'graph>;
-    type ReadT = LmdbReadTransaction<'graph>;
+impl<'access, 'txn: 'access, 'db: 'txn> Graph for LmdbGraph<'db> {
+    type WriteT = LmdbWriteTransaction<'db, 'db>;
+    type ReadT = LmdbReadTransaction<'db, 'db>;
 
     fn write_transaction(&mut self) -> Result<Self::WriteT> {
+        let txn = Arc::new(WTrans::new(self.env.clone())?);
         Ok(LmdbWriteTransaction {
             node_db: self.node_db.clone(),
             node_idx_db: self.node_idx_db.clone(),
@@ -75,19 +76,20 @@ impl<'graph> Graph for LmdbGraph<'graph> {
             edge_idx_db: self.edge_idx_db.clone(),
             hexstore_db: self.hexstore_db.clone(),
 
-            txn: Arc::new(WTrans::new(self.env.clone())?),
+            txn: txn.clone(),
         })
     }
 
     fn read_transaction(&self) -> Result<Self::ReadT> {
+        let txn = Arc::new(RTrans::new(self.env.clone())?);
         Ok(LmdbReadTransaction {
             node_db: self.node_db.clone(),
             node_idx_db: self.node_idx_db.clone(),
-            edge_db: self.edge_db.clone(),
-            edge_idx_db: self.edge_idx_db.clone(),
-            hexstore_db: self.hexstore_db.clone(),
+            // edge_db: self.edge_db.clone(),
+            // edge_idx_db: self.edge_idx_db.clone(),
+            // hexstore_db: self.hexstore_db.clone(),
 
-            txn: Arc::new(RTrans::new(self.env.clone())?),
+            txn: txn.clone(),
         })
     }
 }

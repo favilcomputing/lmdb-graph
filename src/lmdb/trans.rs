@@ -1,28 +1,35 @@
 use lmdb_zero::{
-    error::Error as LmdbError, put, ConstTransaction, Cursor, Database, ReadTransaction as RTrans,
-    WriteTransaction as WTrans,
+    error::Error as LmdbError, put, ConstAccessor, ConstTransaction, Cursor, CursorIter, Database,
+    ReadTransaction as RTrans, WriteAccessor, WriteTransaction as WTrans,
 };
 use serde::{de::DeserializeOwned, Serialize};
-use std::{marker::PhantomData, ops::Deref, sync::Arc};
+use std::{
+    marker::PhantomData,
+    ops::Deref,
+    sync::{Arc, RwLock},
+};
 
 use super::LmdbGraph;
 use crate::{
     error::{Error, Result},
-    graph::{edge::ORDERS, Edge, FromDB, LogId, Node, ReadTransaction, ToDB, WriteTransaction},
+    graph::{
+        edge::ORDERS, trans::NodeReader, Edge, FromDB, LogId, Node, ReadTransaction, ToDB,
+        WriteTransaction,
+    },
 };
 
-pub struct LmdbWriteTransaction<'graph> {
-    pub(crate) node_db: Arc<Database<'graph>>,
-    pub(crate) node_idx_db: Arc<Database<'graph>>,
-    pub(crate) edge_db: Arc<Database<'graph>>,
-    pub(crate) edge_idx_db: Arc<Database<'graph>>,
-    pub(crate) hexstore_db: Arc<Database<'graph>>,
+pub struct LmdbWriteTransaction<'txn, 'db: 'txn> {
+    pub(crate) node_db: Arc<Database<'db>>,
+    pub(crate) node_idx_db: Arc<Database<'db>>,
+    pub(crate) edge_db: Arc<Database<'db>>,
+    pub(crate) edge_idx_db: Arc<Database<'db>>,
+    pub(crate) hexstore_db: Arc<Database<'db>>,
 
-    pub(crate) txn: Arc<WTrans<'graph>>,
+    pub(crate) txn: Arc<WTrans<'txn>>,
 }
 
-impl<'graph> ReadTransaction for LmdbWriteTransaction<'graph> {
-    type Graph = LmdbGraph<'graph>;
+impl<'txn, 'db: 'txn> ReadTransaction for LmdbWriteTransaction<'txn, 'db> {
+    type Graph = LmdbGraph<'db>;
 
     fn get_node<Type, Value>(&self, id: LogId) -> Result<Option<Node<Type, Value>>>
     where
@@ -42,18 +49,10 @@ impl<'graph> ReadTransaction for LmdbWriteTransaction<'graph> {
     {
         LmdbReadTransaction::_get_node_by_value(self.txn.clone(), self.node_idx_db.clone(), n)
     }
-
-    // fn get_all_nodes<Type, Value>(&self) -> Result<self::NodeIter<Type, Value>>
-    // where
-    //     Type: Clone + DeserializeOwned + Serialize,
-    //     Value: Clone + DeserializeOwned + Serialize,
-    // {
-    //     LmdbReadTransaction::_get_all_nodes(&self.txn, self.node_db.clone())
-    // }
 }
 
-impl<'a> WriteTransaction for LmdbWriteTransaction<'a> {
-    type Graph = LmdbGraph<'a>;
+impl<'txn, 'db: 'txn> WriteTransaction for LmdbWriteTransaction<'txn, 'db> {
+    type Graph = LmdbGraph<'db>;
 
     fn put_node<Type, Value>(&mut self, n: Node<Type, Value>) -> Result<Node<Type, Value>>
     where
@@ -61,7 +60,7 @@ impl<'a> WriteTransaction for LmdbWriteTransaction<'a> {
         Value: Clone + Serialize + DeserializeOwned,
     {
         let id = LogId::new();
-        let mut access = self.txn.access();
+        let mut access: WriteAccessor = self.txn.access();
         access.put(
             &self.node_db,
             &Node::<Type, Value>::key_to_db(&id)?,
@@ -84,7 +83,7 @@ impl<'a> WriteTransaction for LmdbWriteTransaction<'a> {
         Value: Clone + Serialize + DeserializeOwned,
     {
         let id = LogId::new();
-        let mut access = self.txn.access();
+        let mut access: WriteAccessor = self.txn.access();
         access.put(
             &self.edge_db,
             &Edge::<Type, Value>::key_to_db(&id)?,
@@ -110,7 +109,10 @@ impl<'a> WriteTransaction for LmdbWriteTransaction<'a> {
     }
 
     fn commit(self) -> Result<()> {
-        let txn = Arc::try_unwrap(self.txn).unwrap();
+        let txn = match Arc::try_unwrap(self.txn) {
+            Ok(a) => a,
+            Err(_) => return Err(Error::UsedArc),
+        };
         Ok(txn.commit()?)
     }
 
@@ -122,20 +124,19 @@ impl<'a> WriteTransaction for LmdbWriteTransaction<'a> {
     }
 }
 
-pub struct LmdbReadTransaction<'graph> {
-    pub(crate) node_db: Arc<Database<'graph>>,
-    pub(crate) node_idx_db: Arc<Database<'graph>>,
-    pub(crate) edge_db: Arc<Database<'graph>>,
-    pub(crate) edge_idx_db: Arc<Database<'graph>>,
-    pub(crate) hexstore_db: Arc<Database<'graph>>,
-
-    pub(crate) txn: Arc<RTrans<'graph>>,
+pub struct LmdbReadTransaction<'txn, 'db: 'txn> {
+    pub(crate) node_db: Arc<Database<'db>>,
+    pub(crate) node_idx_db: Arc<Database<'db>>,
+    // pub(crate) edge_db: Arc<Database<'db>>,
+    // pub(crate) edge_idx_db: Arc<Database<'db>>,
+    // pub(crate) hexstore_db: Arc<Database<'db>>,
+    pub(crate) txn: Arc<RTrans<'txn>>,
 }
 
-impl<'graph> LmdbReadTransaction<'graph> {
+impl<'txn, 'db: 'txn> LmdbReadTransaction<'txn, 'db> {
     fn _get_node<Type, Value>(
-        txn: Arc<impl Deref<Target = ConstTransaction<'graph>>>,
-        db: Arc<Database<'graph>>,
+        txn: Arc<impl Deref<Target = ConstTransaction<'txn>>>,
+        db: Arc<Database<'db>>,
         id: LogId,
     ) -> Result<Option<Node<Type, Value>>>
     where
@@ -154,8 +155,8 @@ impl<'graph> LmdbReadTransaction<'graph> {
     }
 
     fn _get_node_by_value<Type, Value>(
-        txn: Arc<impl Deref<Target = ConstTransaction<'graph>>>,
-        db: Arc<Database<'graph>>,
+        txn: Arc<impl Deref<Target = ConstTransaction<'txn>>>,
+        db: Arc<Database<'db>>,
         n: &Node<Type, Value>,
     ) -> Result<Option<Node<Type, Value>>>
     where
@@ -177,8 +178,8 @@ impl<'graph> LmdbReadTransaction<'graph> {
     }
 
     fn _get_edge<Type, Value>(
-        txn: Arc<ConstTransaction>,
-        db: Arc<Database<'graph>>,
+        txn: Arc<impl Deref<Target = ConstTransaction<'static>> + 'static>,
+        db: Arc<Database<'static>>,
         id: LogId,
     ) -> Result<Option<Edge<Type, Value>>>
     where
@@ -195,17 +196,10 @@ impl<'graph> LmdbReadTransaction<'graph> {
         let node = Edge::from_db(&id, &buf?);
         node.map(Option::Some)
     }
-
-    // fn _get_all_nodes<Type, Value>(
-    //     txn: Arc<ConstTransaction>,
-    //     db: Arc<Database<'graph>>,
-    // ) -> Result<NodeIter<Type, Value>> {
-    //     Ok(NodeIter::new(Arc::new(txn.cursor(db.clone())?)))
-    // }
 }
 
-impl<'graph> ReadTransaction for LmdbReadTransaction<'graph> {
-    type Graph = LmdbGraph<'graph>;
+impl<'txn, 'db: 'txn> ReadTransaction for LmdbReadTransaction<'txn, 'db> {
+    type Graph = LmdbGraph<'db>;
 
     fn get_node<Type, Value>(&self, id: LogId) -> Result<Option<Node<Type, Value>>>
     where
@@ -225,31 +219,79 @@ impl<'graph> ReadTransaction for LmdbReadTransaction<'graph> {
     {
         Self::_get_node_by_value(self.txn.clone(), self.node_idx_db.clone(), n)
     }
-    // fn get_all_nodes<Type, Value>(&self) -> Result<NodeIter<Type, Value>> {
-    //     Self::_get_all_nodes(&self.txn, self.node_db.clone())
-    // }
 }
 
-#[derive(Debug)]
-pub struct NodeIter<Type, Value> {
-    cursor: Arc<Cursor<'static, 'static>>,
-    _marker: PhantomData<(Type, Value)>,
-}
+impl<'txn, 'db: 'txn> NodeReader for LmdbReadTransaction<'txn, 'db> {
+    type Graph = LmdbGraph<'db>;
 
-impl<Type, Value> NodeIter<Type, Value> {
-    pub fn new(cursor: Arc<Cursor<'static, 'static>>) -> Self {
-        Self {
-            cursor,
-            _marker: PhantomData,
-        }
+    fn all_nodes<Type, Value, T>(&self) -> Result<T>
+    where
+        T: Iterator<Item = Node<Type, Value>>,
+    {
+        todo!()
     }
 }
 
-impl<Type, Value> Iterator for NodeIter<Type, Value> {
+impl<'txn, 'db: 'txn> NodeReader for LmdbWriteTransaction<'txn, 'db> {
+    type Graph = LmdbGraph<'db>;
+
+    fn all_nodes<Type, Value, T>(&self) -> Result<T>
+    where
+        T: Iterator<Item = Node<Type, Value>>,
+    {
+        todo!()
+    }
+}
+
+impl<'txn, 'db: 'txn> LmdbReadTransaction<'txn, 'db> {
+    // fn _all_nodes<'access, Type, Value>(
+    //     &self,
+    // ) -> Result<NodeIter<'access, 'txn, 'db, Type, Value>> {
+    //     let mut access: ConstAccessor = self.txn.access();
+    //     let mut cursor = Arc::new(RwLock::new(self.txn.cursor(self.node_db.clone())?));
+    //     Ok(NodeIter::new(cursor, &access)?)
+    // }
+}
+
+// #[derive(Debug)]
+pub struct NodeIter<'access, 'txn: 'access, 'db: 'txn, Type, Value> {
+    cursor: Arc<RwLock<Cursor<'txn, 'db>>>,
+    access: &'access ConstAccessor<'access>,
+    _marker: PhantomData<(Type, Value)>,
+}
+
+impl<'access, 'txn: 'access, 'db: 'txn, Type, Value> NodeIter<'access, 'txn, 'db, Type, Value> {
+    pub fn new(
+        cursor: Arc<RwLock<Cursor<'txn, 'db>>>,
+        access: &'access ConstAccessor<'access>,
+    ) -> Result<Self> {
+        Ok(Self {
+            cursor,
+            access,
+            _marker: PhantomData,
+        })
+    }
+}
+
+impl<'access, 'txn: 'access, 'db: 'txn, Type, Value> Iterator
+    for NodeIter<'access, 'txn, 'db, Type, Value>
+where
+    Type: DeserializeOwned,
+    Value: DeserializeOwned,
+{
     type Item = Node<Type, Value>;
 
     fn next(&mut self) -> Option<Self::Item> {
         todo!()
+        // let next = self.cursor.next();
+        // if next.is_none() {
+        //     return None;
+        // }
+        // let next = next.unwrap();
+        // let (k, v) = next.unwrap();
+        // Some(
+        //     Node::<Type, Value>::from_db(&Node::<Type, Value>::key_from_db(k).unwrap(), v).unwrap(),
+        // )
     }
 }
 
@@ -259,7 +301,6 @@ mod tests {
 
     use super::*;
     use crate::graph::Graph;
-    use itertools::assert_equal;
     use tempdir::TempDir;
 
     #[fixture]
@@ -350,27 +391,27 @@ mod tests {
         Ok(())
     }
 
-    // #[rstest]
-    // fn all_nodes(graph: Result<impl Graph>) -> Result<()> {
-    //     let mut graph = graph?;
+    #[rstest]
+    fn all_nodes(graph: Result<impl Graph>) -> Result<()> {
+        let mut graph = graph?;
 
-    //     let _type = "name".to_string();
-    //     let name = "Kevin".to_string();
-    //     let node = Node::new(_type.clone(), name.clone())?;
+        let _type = "name".to_string();
+        let name = "Kevin".to_string();
+        let node = Node::new(_type.clone(), name.clone())?;
 
-    //     let mut txn = graph.write_transaction()?;
-    //     let put = txn.put_node(node.clone())?;
-    //     // Put some more to make sure writes don't affect things
-    //     let charles = txn.put_node(Node::new("name".to_string(), "Charles".to_string())?)?;
-    //     txn.commit()?;
+        let mut txn = graph.write_transaction()?;
+        let put = txn.put_node(node.clone())?;
+        // Put some more to make sure writes don't affect things
+        let charles = txn.put_node(Node::new("name".to_string(), "Charles".to_string())?)?;
+        txn.commit()?;
 
-    //     let txn = graph.read_transaction()?;
-    //     assert_eq!(
-    //         txn.get_all_nodes::<String, String>()?
-    //             .collect::<Vec<Node<String, String>>>(),
-    //         vec![put, charles]
-    //     );
+        let txn = graph.read_transaction()?;
+        // assert_eq!(
+        //     txn.all_nodes::<String, String>()?
+        //         .collect::<Vec<Node<String, String>>>(),
+        //     vec![put, charles]
+        // );
 
-    //     Ok(())
-    // }
+        Ok(())
+    }
 }

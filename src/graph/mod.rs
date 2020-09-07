@@ -11,10 +11,11 @@ pub use self::{
     trans::{ReadTransaction, WriteTransaction},
 };
 use crate::error::Result;
+use trans::NodeReader;
 
 pub trait Graph {
-    type ReadT: ReadTransaction;
-    type WriteT: ReadTransaction + WriteTransaction;
+    type ReadT: ReadTransaction + NodeReader;
+    type WriteT: ReadTransaction + WriteTransaction + NodeReader;
 
     fn write_transaction(&mut self) -> Result<Self::WriteT>;
     fn read_transaction(&self) -> Result<Self::ReadT>;

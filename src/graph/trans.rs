@@ -2,7 +2,6 @@ use serde::{de::DeserializeOwned, Serialize};
 
 use super::{Edge, LogId, Node};
 use crate::error::Result;
-use std::{marker::PhantomData, sync::Arc};
 
 pub trait WriteTransaction {
     type Graph;
@@ -39,9 +38,10 @@ pub trait ReadTransaction {
         Value: Clone + DeserializeOwned + Serialize;
 }
 
-pub(crate) trait NodeReader<Type, Value> {
+pub trait NodeReader {
     type Graph;
-    type Iter;
 
-    fn all_nodes(&self) -> Result<Self::Iter>;
+    fn all_nodes<Type, Value, T>(&self) -> Result<T>
+    where
+        T: Iterator<Item = Node<Type, Value>>;
 }
