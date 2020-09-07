@@ -40,25 +40,22 @@ impl HexOrder {
 }
 
 #[derive(Debug, PartialEq, Clone, Serialize, Deserialize)]
-pub struct Edge<Type, Value> {
+pub struct Edge<Value> {
     pub(crate) id: Option<LogId>,
     pub(crate) to: LogId,
     pub(crate) from: LogId,
-    pub(crate) _type: Type,
     pub(crate) value: Value,
 }
 
-impl<Type, Value> Edge<Type, Value>
+impl<Value> Edge<Value>
 where
-    Type: Serialize + DeserializeOwned + Clone,
     Value: Serialize + DeserializeOwned + Clone,
 {
-    pub fn new(to: LogId, from: LogId, _type: Type, value: Value) -> Result<Self> {
+    pub fn new(to: LogId, from: LogId, value: Value) -> Result<Self> {
         Ok(Self {
             id: None,
             to,
             from,
-            _type,
             value,
         })
     }
@@ -68,9 +65,8 @@ where
     }
 }
 
-impl<Type, Value> FromDB<Value> for Edge<Type, Value>
+impl<Value> FromDB<Value> for Edge<Value>
 where
-    Type: DeserializeOwned,
     Value: DeserializeOwned,
 {
     type Key = LogId;
@@ -78,7 +74,6 @@ where
     fn from_db(id: &Self::Key, data: &[u8]) -> Result<Self>
     where
         Self: Sized,
-        Type: DeserializeOwned,
         Value: DeserializeOwned,
     {
         let edge = from_read_ref::<[u8], Self>(data)?;
@@ -91,16 +86,14 @@ where
     fn key_from_db(key: &[u8]) -> Result<Self::Key>
     where
         Self: Sized,
-        Type: DeserializeOwned,
         Value: DeserializeOwned,
     {
         Ok(from_read_ref::<[u8], Self::Key>(key)?)
     }
 }
 
-impl<Type, Value> ToDB for Edge<Type, Value>
+impl<Value> ToDB for Edge<Value>
 where
-    Type: Serialize,
     Value: Serialize,
 {
     type Key = LogId;
@@ -113,7 +106,7 @@ where
 
     fn value_to_db(&self) -> Result<Vec<u8>> {
         let mut buf = Vec::new();
-        (&self._type, &self.value).serialize(&mut Serializer::new(&mut buf))?;
+        &self.value.serialize(&mut Serializer::new(&mut buf))?;
         Ok(buf)
     }
 
@@ -140,16 +133,11 @@ mod tests {
     fn test_serialize() -> Result<()> {
         let value = "Testing".to_string();
 
-        let mut edge = Edge::new(
-            LogId::nil(),
-            LogId::nil(),
-            "Name".to_string(),
-            value.clone(),
-        )?;
+        let mut edge = Edge::new(LogId::nil(), LogId::nil(), value.clone())?;
         edge.id = Some(LogId::nil());
         assert_eq!(edge.get_value(), value);
         assert_eq!(
-            Edge::<String, String>::from_db(&LogId::nil(), edge.to_db()?.as_slice())?,
+            Edge::<String>::from_db(&LogId::nil(), edge.to_db()?.as_slice())?,
             edge
         );
         Ok(())

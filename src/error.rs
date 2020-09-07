@@ -1,4 +1,5 @@
 use lmdb_zero;
+use heed;
 use rmp_serde::{decode, encode};
 use ulid::DecodeError;
 
@@ -23,7 +24,9 @@ pub enum Error {
 #[derive(Debug)]
 pub enum InternalError {
     IoError(io::Error),
+    UlidOverflow,
     Lmdb(lmdb_zero::error::Error),
+    Heed(heed::Error),
     BadWrite,
 }
 
@@ -55,4 +58,17 @@ impl From<DecodeError> for Error {
     fn from(e: DecodeError) -> Self {
         Self::Ulid(e)
     }
+}
+
+impl From<heed::Error> for Error {
+    fn from(e: heed::Error) -> Self {
+        Self::Internal(InternalError::Heed(e))
+    }
+}
+
+impl From<ulid::MonotonicError> for Error {
+    fn from(_: ulid::MonotonicError) -> Self {
+        Self::Internal(InternalError::UlidOverflow)
+    }
+
 }

@@ -29,8 +29,6 @@ pub struct LmdbWriteTransaction<'txn, 'db: 'txn> {
 }
 
 impl<'txn, 'db: 'txn> ReadTransaction for LmdbWriteTransaction<'txn, 'db> {
-    type Graph = LmdbGraph<'db>;
-
     fn get_node<Type, Value>(&self, id: LogId) -> Result<Option<Node<Type, Value>>>
     where
         Type: Clone + Serialize + DeserializeOwned,
@@ -52,8 +50,6 @@ impl<'txn, 'db: 'txn> ReadTransaction for LmdbWriteTransaction<'txn, 'db> {
 }
 
 impl<'txn, 'db: 'txn> WriteTransaction for LmdbWriteTransaction<'txn, 'db> {
-    type Graph = LmdbGraph<'db>;
-
     fn put_node<Type, Value>(&mut self, n: Node<Type, Value>) -> Result<Node<Type, Value>>
     where
         Type: Clone + Serialize + DeserializeOwned,
@@ -199,8 +195,6 @@ impl<'txn, 'db: 'txn> LmdbReadTransaction<'txn, 'db> {
 }
 
 impl<'txn, 'db: 'txn> ReadTransaction for LmdbReadTransaction<'txn, 'db> {
-    type Graph = LmdbGraph<'db>;
-
     fn get_node<Type, Value>(&self, id: LogId) -> Result<Option<Node<Type, Value>>>
     where
         Type: Clone + Serialize + DeserializeOwned,
@@ -222,8 +216,6 @@ impl<'txn, 'db: 'txn> ReadTransaction for LmdbReadTransaction<'txn, 'db> {
 }
 
 impl<'txn, 'db: 'txn> NodeReader for LmdbReadTransaction<'txn, 'db> {
-    type Graph = LmdbGraph<'db>;
-
     fn all_nodes<Type, Value, T>(&self) -> Result<T>
     where
         T: Iterator<Item = Node<Type, Value>>,
@@ -233,8 +225,6 @@ impl<'txn, 'db: 'txn> NodeReader for LmdbReadTransaction<'txn, 'db> {
 }
 
 impl<'txn, 'db: 'txn> NodeReader for LmdbWriteTransaction<'txn, 'db> {
-    type Graph = LmdbGraph<'db>;
-
     fn all_nodes<Type, Value, T>(&self) -> Result<T>
     where
         T: Iterator<Item = Node<Type, Value>>,

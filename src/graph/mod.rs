@@ -1,27 +1,52 @@
 pub(crate) mod edge;
 pub(crate) mod node;
-pub(crate) mod trans;
+pub(crate) mod txn;
 
-use serde::{de::DeserializeOwned, Serialize};
-use ulid::Ulid;
+use postcard::{from_bytes, to_stdvec};
+use serde::{de::DeserializeOwned, Deserialize, Serialize};
+use ulid::{Generator, Ulid};
 
-pub use self::{
-    edge::Edge,
-    node::Node,
-    trans::{ReadTransaction, WriteTransaction},
-};
+pub use self::{edge::Edge, node::Node};
 use crate::error::Result;
-use trans::NodeReader;
+use heed::{BytesDecode, BytesEncode};
+use std::{borrow::Cow, hash::Hash, convert::TryInto};
 
-pub trait Graph {
-    type ReadT: ReadTransaction + NodeReader;
-    type WriteT: ReadTransaction + WriteTransaction + NodeReader;
+#[derive(Serialize, Deserialize, PartialEq, PartialOrd, Debug, Clone, Copy, Eq, Ord, Hash)]
+pub struct LogId(Ulid);
 
-    fn write_transaction(&mut self) -> Result<Self::WriteT>;
-    fn read_transaction(&self) -> Result<Self::ReadT>;
+impl LogId {
+    pub fn new(gen: &mut Generator) -> Result<Self> {
+        Ok(Self(gen.generate()?))
+    }
+
+    pub fn nil() -> Self {
+        Self(Ulid::nil())
+    }
+
+    pub fn max() -> Self {
+        Self(Ulid(u128::max_value()))
+    }
 }
 
-pub type LogId = Ulid;
+impl<'a> BytesEncode<'a> for LogId {
+    type EItem = LogId;
+    fn bytes_encode(item: &'a Self::EItem) -> Option<std::borrow::Cow<'a, [u8]>> {
+        Some(Cow::Owned((item.0).0.to_be_bytes().to_vec()))
+    }
+}
+
+impl<'a> BytesDecode<'a> for LogId {
+    type DItem = LogId;
+
+    fn bytes_decode(bytes: &'a [u8]) -> Option<Self::DItem> {
+        if bytes.len() != 16 {
+            None
+        } else {
+            let bytes = &bytes[0..16];
+            Some(LogId(Ulid(u128::from_be_bytes(bytes.try_into().unwrap()))))
+        }
+    }
+}
 
 pub trait FromDB<Value> {
     type Key: Serialize + DeserializeOwned;
