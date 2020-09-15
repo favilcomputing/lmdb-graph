@@ -1,15 +1,13 @@
 pub(crate) mod edge;
 pub(crate) mod node;
-pub(crate) mod txn;
 
-use postcard::{from_bytes, to_stdvec};
 use serde::{de::DeserializeOwned, Deserialize, Serialize};
 use ulid::{Generator, Ulid};
 
 pub use self::{edge::Edge, node::Node};
 use crate::error::Result;
 use heed::{BytesDecode, BytesEncode};
-use std::{borrow::Cow, hash::Hash, convert::TryInto};
+use std::{borrow::Cow, convert::TryInto, hash::Hash};
 
 #[derive(Serialize, Deserialize, PartialEq, PartialOrd, Debug, Clone, Copy, Eq, Ord, Hash)]
 pub struct LogId(Ulid);
@@ -51,7 +49,7 @@ impl<'a> BytesDecode<'a> for LogId {
 pub trait FromDB<Value> {
     type Key: Serialize + DeserializeOwned;
 
-    fn from_db(key: &Self::Key, data: &[u8]) -> Result<Self>
+    fn rev_from_db(data: &[u8]) -> Result<Self>
     where
         Self: Sized,
         Value: DeserializeOwned;
@@ -65,7 +63,7 @@ pub trait FromDB<Value> {
 pub trait ToDB {
     type Key: Serialize + DeserializeOwned;
 
-    fn to_db(&self) -> Result<Vec<u8>>;
+    fn rev_to_db(&self) -> Result<Vec<u8>>;
     fn value_to_db(&self) -> Result<Vec<u8>>;
     fn key(&self) -> Result<Vec<u8>>;
     fn key_to_db(key: &Self::Key) -> Result<Vec<u8>>;

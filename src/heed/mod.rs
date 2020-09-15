@@ -1,5 +1,4 @@
 pub mod node;
-pub mod txn;
 
 use heed::{types::OwnedSlice, Database, Env, EnvOpenOptions, RoTxn, RwTxn};
 use serde::{de::DeserializeOwned, Serialize};
@@ -8,8 +7,9 @@ use std::{fmt::Debug, ops::Deref, path::Path, sync::Mutex};
 use self::node::NodeIter;
 use crate::{
     error::Result,
-    graph::{Edge, FromDB, LogId, Node, ToDB},
+    graph::{Edge, LogId, Node, ToDB},
 };
+use node::NodeRange;
 use ulid::Generator;
 
 pub struct Graph<T> {
@@ -62,12 +62,22 @@ where
     }
 
     pub fn put_node(&self, txn: &mut WriteTxn, n: Node<Value>) -> Result<Node<Value>> {
-        let id = LogId::new(&mut self.generator.lock().unwrap())?;
-        let n = Node { id: Some(id), ..n };
-        self.node_db.put(&mut txn.0, &id, &n)?;
-        self.node_idx_db.put(&mut txn.0, &n.value_to_db()?, &id)?;
+        let n = if n.id.is_some() {
+            let node: Option<Node<Value>> = self.node_db.get(&txn, &n.id.unwrap())?;
+            if let Some(node) = node {
+                self.node_idx_db.delete(&mut txn.0, &node.rev_to_db()?)?;
+            }
+            n
+        } else {
+            let id = LogId::new(&mut self.generator.lock().unwrap())?;
+            Node { id: Some(id), ..n }
+        };
+        self.node_db.put(&mut txn.0, n.id.as_ref().unwrap(), &n)?;
+        let rev = &n.rev_to_db()?;
+        self.node_idx_db
+            .put(&mut txn.0, rev, n.id.as_ref().unwrap())?;
 
-        Ok(Node { id: Some(id), ..n })
+        Ok(n)
     }
 
     pub fn get_node_by_id<Txn>(&self, txn: &Txn, id: &LogId) -> Result<Option<Node<Value>>>
@@ -78,19 +88,38 @@ where
         Ok(node)
     }
 
-    pub fn get_node_by_value<Txn>(
+    pub fn get_nodes_by_value<'txn, Txn: 'txn>(
         &self,
-        txn: &Txn,
-        node: &Node<Value>,
+        txn: &'txn Txn,
+        value: &Value,
+    ) -> Result<NodeRange<'txn, Value>>
+    where
+        Txn: Deref<Target = RoTxn>,
+        Value: Clone,
+    {
+        let prefix = Node::new(value.clone())?.value_to_db()?;
+        let iter = self.node_idx_db.prefix_iter(&txn, &prefix)?;
+        Ok(NodeRange::new(iter))
+    }
+
+    pub fn get_node_by_value<'txn, Txn: 'txn>(
+        &self,
+        txn: &'txn Txn,
+        value: &Value,
     ) -> Result<Option<Node<Value>>>
     where
         Txn: Deref<Target = RoTxn>,
+        Value: Clone,
     {
-        let id: Option<LogId> = self.node_idx_db.get(&txn, &node.value_to_db()?)?;
-        Ok(id.map(|id| Node {
-            id: Some(id),
-            value: node.value.clone(),
-        }))
+        Ok(self.get_nodes_by_value(txn, value)?.next())
+    }
+
+    pub fn node_count<Txn>(&self, txn: &Txn) -> Result<usize>
+    where
+        Txn: Deref<Target = RoTxn>,
+    {
+        assert_eq!(self.node_db.len(&txn)?, self.node_idx_db.len(&txn)?);
+        Ok(self.node_db.len(&txn)?)
     }
 
     pub fn nodes<'txn, Txn>(&self, txn: &'txn Txn) -> Result<NodeIter<'txn, Value>>
@@ -144,7 +173,6 @@ mod tests {
     use rstest::{fixture, rstest};
 
     use super::*;
-    use std::collections::HashSet;
     use tempdir::TempDir;
 
     #[allow(dead_code)]
@@ -204,20 +232,19 @@ mod tests {
         txn.commit()?;
 
         let txn = graph.read_txn()?;
-        let fetched = graph.get_node_by_value(&txn, &node)?;
+        let fetched = graph.get_node_by_value(&txn, &node.value)?;
         assert!(fetched.is_some());
         let fetched = fetched.unwrap();
         assert_eq!(fetched.id, returned.id);
         assert_eq!(node.value, fetched.value);
 
-        let fetched = graph.get_node_by_value(&txn, &Node::new("test2".to_string())?)?;
+        let fetched = graph.get_node_by_value(&txn, &"test2".to_string())?;
         assert!(fetched.is_none());
         Ok(())
     }
 
     #[rstest]
-    fn test_nodes(graph: Graph<String>) -> Result<()> {
-        // let mut returned = HashSet::new();
+    fn test_node_iter(graph: Graph<String>) -> Result<()> {
         let mut returned = vec![];
         let mut txn = graph.write_txn()?;
 
@@ -230,6 +257,26 @@ mod tests {
         let txn = graph.read_txn()?;
         let nodes: Vec<_> = graph.nodes(&txn)?.collect();
         assert_eq!(nodes, returned);
+
+        Ok(())
+    }
+
+    #[rstest]
+    fn test_put_existing_node(graph: Graph<String>) -> Result<()> {
+        let node = Node::new("tester".to_string())?;
+        let mut txn = graph.write_txn()?;
+
+        let mut returned = graph.put_node(&mut txn, node.clone())?;
+        returned.value = "testers".to_string();
+        graph.put_node(&mut txn, returned.clone())?;
+        txn.commit()?;
+
+        let txn = graph.read_txn()?;
+
+        assert_eq!(graph.node_count(&txn)?, 1);
+        let n = graph.get_node_by_id(&txn, returned.id.as_ref().unwrap())?;
+        assert!(n.is_some());
+        assert_eq!(n.unwrap().value, returned.value);
 
         Ok(())
     }

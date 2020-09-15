@@ -8,12 +8,8 @@ edition = "2018"
 
 [dependencies]
 itertools = "0.9.0"
-lmdb-zero = "0.4.4"
 log = "0.4.11"
 rand = "0.7.3"
-rmp = "0.8.9"
-rmp-serde = "0.14.4"
-rmpv = "0.4.5"
 serde = { version = "1.0.115", features = ["derive"] }
 supercow = "0.1.0"
 ulid = { version = "0.4.0", features = ["serde"] }

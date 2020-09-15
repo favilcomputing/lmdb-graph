@@ -1,11 +1,10 @@
 use heed::{BytesDecode, BytesEncode};
 use postcard::{from_bytes, to_stdvec};
-use rmp_serde::{from_read_ref, Serializer};
 use serde::{de::DeserializeOwned, Deserialize, Serialize};
 
 use super::{FromDB, LogId, ToDB};
 use crate::error::Result;
-use std::{hash::Hash, borrow::Cow};
+use std::{borrow::Cow, fmt::Debug, hash::Hash};
 
 #[derive(Debug, PartialEq, Clone, Serialize, Deserialize, Eq, Hash)]
 pub struct Node<Value> {
@@ -56,24 +55,25 @@ where
 {
     type Key = LogId;
 
-    fn from_db(key: &Self::Key, data: &[u8]) -> Result<Self>
+    fn rev_from_db(data: &[u8]) -> Result<Self>
     where
         Self: Sized,
         Value: DeserializeOwned,
     {
-        let node = from_read_ref::<[u8], Self>(data)?;
+        let (value, id): (Value, LogId) = from_bytes(data)?;
         Ok(Self {
-            id: Some(key.clone()),
-            ..node
+            id: Some(id),
+            value,
         })
     }
 
-    fn key_from_db(key: &[u8]) -> Result<Self::Key>
+    fn key_from_db(_key: &[u8]) -> Result<Self::Key>
     where
         Self: Sized,
         Value: DeserializeOwned,
     {
-        Ok(from_read_ref::<[u8], Self::Key>(key)?)
+        // Ok(from_read_ref::<[u8], Self::Key>(key)?)
+        todo!()
     }
 }
 
@@ -83,28 +83,19 @@ where
 {
     type Key = LogId;
 
-    fn to_db(&self) -> Result<Vec<u8>> {
-        let mut buf = Vec::new();
-        self.serialize(&mut Serializer::new(&mut buf))?;
-        Ok(buf)
+    fn rev_to_db(&self) -> Result<Vec<u8>> {
+        Ok(to_stdvec(&(&self.value, &self.id.unwrap()))?)
     }
 
     fn value_to_db(&self) -> Result<Vec<u8>> {
-        let mut buf = Vec::new();
-        &self.value.serialize(&mut Serializer::new(&mut buf))?;
-        Ok(buf)
+        Ok(to_stdvec(&self.value)?)
     }
-
     fn key(&self) -> Result<Vec<u8>> {
-        let mut buf = Vec::new();
-        self.id.serialize(&mut Serializer::new(&mut buf))?;
-        Ok(buf)
+        Ok(to_stdvec(&self.id)?)
     }
 
     fn key_to_db(key: &Self::Key) -> Result<Vec<u8>> {
-        let mut buf = Vec::new();
-        key.serialize(&mut Serializer::new(&mut buf))?;
-        Ok(buf)
+        Ok(to_stdvec(key)?)
     }
 }
 

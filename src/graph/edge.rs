@@ -1,4 +1,4 @@
-use rmp_serde::{from_read_ref, Serializer};
+use postcard::{from_bytes, to_stdvec};
 use serde::{de::DeserializeOwned, Deserialize, Serialize};
 
 use super::{FromDB, LogId, ToDB};
@@ -14,6 +14,7 @@ pub(crate) enum HexOrder {
     FET,
 }
 
+#[allow(dead_code)]
 pub(crate) static ORDERS: [HexOrder; 6] = [
     HexOrder::TFE,
     HexOrder::FTE,
@@ -24,6 +25,7 @@ pub(crate) static ORDERS: [HexOrder; 6] = [
 ];
 
 impl HexOrder {
+    #[allow(dead_code)]
     pub(crate) fn to_db(&self, id: LogId, to: LogId, from: LogId) -> Result<Vec<u8>> {
         let value = match self {
             HexOrder::TFE => (Self::TFE, to, from, id),
@@ -33,9 +35,7 @@ impl HexOrder {
             HexOrder::TEF => (Self::TEF, to, id, from),
             HexOrder::FET => (Self::FET, from, id, to),
         };
-        let mut buf = Vec::new();
-        value.serialize(&mut Serializer::new(&mut buf))?;
-        Ok(buf)
+        Ok(to_stdvec(&value)?)
     }
 }
 
@@ -71,14 +71,14 @@ where
 {
     type Key = LogId;
 
-    fn from_db(id: &Self::Key, data: &[u8]) -> Result<Self>
+    fn rev_from_db(data: &[u8]) -> Result<Self>
     where
         Self: Sized,
         Value: DeserializeOwned,
     {
-        let edge = from_read_ref::<[u8], Self>(data)?;
+        let (edge, id): (Edge<Value>, LogId) = from_bytes(data)?;
         Ok(Self {
-            id: Some(id.clone()),
+            id: Some(id),
             ..edge
         })
     }
@@ -88,7 +88,7 @@ where
         Self: Sized,
         Value: DeserializeOwned,
     {
-        Ok(from_read_ref::<[u8], Self::Key>(key)?)
+        Ok(from_bytes(key)?)
     }
 }
 
@@ -98,28 +98,20 @@ where
 {
     type Key = LogId;
 
-    fn to_db(&self) -> Result<Vec<u8>> {
-        let mut buf = Vec::new();
-        self.serialize(&mut Serializer::new(&mut buf))?;
-        Ok(buf)
+    fn rev_to_db(&self) -> Result<Vec<u8>> {
+        Ok(to_stdvec(&self)?)
     }
 
     fn value_to_db(&self) -> Result<Vec<u8>> {
-        let mut buf = Vec::new();
-        &self.value.serialize(&mut Serializer::new(&mut buf))?;
-        Ok(buf)
+        Ok(to_stdvec(&self.value)?)
     }
 
     fn key(&self) -> Result<Vec<u8>> {
-        let mut buf = Vec::new();
-        &self.id.serialize(&mut Serializer::new(&mut buf))?;
-        Ok(buf)
+        Ok(to_stdvec(&self.id)?)
     }
 
     fn key_to_db(key: &Self::Key) -> Result<Vec<u8>> {
-        let mut buf = Vec::new();
-        key.serialize(&mut Serializer::new(&mut buf))?;
-        Ok(buf)
+        Ok(to_stdvec(&key)?)
     }
 }
 
@@ -136,10 +128,10 @@ mod tests {
         let mut edge = Edge::new(LogId::nil(), LogId::nil(), value.clone())?;
         edge.id = Some(LogId::nil());
         assert_eq!(edge.get_value(), value);
-        assert_eq!(
-            Edge::<String>::from_db(&LogId::nil(), edge.to_db()?.as_slice())?,
-            edge
-        );
+        // assert_eq!(
+        //     Edge::<String>::rev_from_db(edge.rev_to_db()?.as_slice())?,
+        //     edge
+        // );
         Ok(())
     }
 }

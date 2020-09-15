@@ -1,3 +1,4 @@
+#[allow(unused_imports)]
 use lmdb_graph::{
     error::Result,
     graph::{Edge, Node},
@@ -24,13 +25,13 @@ fn main() -> Result<()> {
     fs::create_dir_all("test.db")?;
     let graph = Graph::new("test.db")?;
     let mut txn = graph.write_txn()?;
-    let n = graph.get_node_by_value(&txn, &Node::new(NodeType::Name("Phineas".to_string()))?)?;
+    let n = graph.get_node_by_value(&txn, &NodeType::Name("Phineas".to_string()))?;
     if n.is_some() {
         log::info!("Phineas found, clearing database");
         graph.clear(&mut txn)?;
     }
-    let phineas = graph.put_node(&mut txn, Node::new(NodeType::Name("Phineas".to_string()))?)?;
-    let ferb = graph.put_node(&mut txn, Node::new(NodeType::Name("Ferb".to_string()))?)?;
+    let _phineas = graph.put_node(&mut txn, Node::new(NodeType::Name("Phineas".to_string()))?)?;
+    let _ferb = graph.put_node(&mut txn, Node::new(NodeType::Name("Ferb".to_string()))?)?;
     graph.put_node(&mut txn, Node::new(NodeType::Name("Candace".to_string()))?)?;
     graph.put_node(&mut txn, Node::new(NodeType::Name("Isabella".to_string()))?)?;
 
@@ -46,7 +47,7 @@ fn main() -> Result<()> {
     txn.commit()?;
 
     let txn = graph.read_txn()?;
-    let isabella = graph.get_node_by_value(&txn, &Node::new(NodeType::Name("Isabella".to_string()))?)?;
+    let isabella = graph.get_node_by_value(&txn, &NodeType::Name("Isabella".to_string()))?;
     log::info!("Found node: {:?}", isabella);
 
     Ok(())
