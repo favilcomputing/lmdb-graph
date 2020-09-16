@@ -3,6 +3,8 @@ use serde::{de::DeserializeOwned, Deserialize, Serialize};
 
 use super::{FromDB, LogId, ToDB};
 use crate::error::Result;
+use heed::{BytesDecode, BytesEncode};
+use std::borrow::Cow;
 
 #[derive(Debug, PartialEq, Clone, Copy, Serialize, Deserialize)]
 pub(crate) enum HexOrder {
@@ -65,6 +67,25 @@ where
     }
 }
 
+impl<'a, Value: 'a + Serialize> BytesEncode<'a> for Edge<Value> {
+    type EItem = Edge<Value>;
+
+    fn bytes_encode(item: &'a Self::EItem) -> Option<std::borrow::Cow<'a, [u8]>> {
+        match to_stdvec(item).ok() {
+            Some(vec) => Some(Cow::Owned(vec)),
+            None => None,
+        }
+    }
+}
+
+impl<'a, Value: 'a + DeserializeOwned> BytesDecode<'a> for Edge<Value> {
+    type DItem = Edge<Value>;
+
+    fn bytes_decode(bytes: &'a [u8]) -> Option<Self::DItem> {
+        from_bytes(bytes).ok()
+    }
+}
+
 impl<Value> FromDB<Value> for Edge<Value>
 where
     Value: DeserializeOwned,
@@ -76,10 +97,12 @@ where
         Self: Sized,
         Value: DeserializeOwned,
     {
-        let (edge, id): (Edge<Value>, LogId) = from_bytes(data)?;
+        let (value, to, from, id): (Value, LogId, LogId, LogId) = from_bytes(data)?;
         Ok(Self {
             id: Some(id),
-            ..edge
+            to,
+            from,
+            value,
         })
     }
 
@@ -97,13 +120,19 @@ where
     Value: Serialize,
 {
     type Key = LogId;
+    type Value = Value;
 
     fn rev_to_db(&self) -> Result<Vec<u8>> {
-        Ok(to_stdvec(&self)?)
+        Ok(to_stdvec(&(
+            &self.value,
+            &self.to,
+            &self.from,
+            &self.id.unwrap(),
+        ))?)
     }
 
-    fn value_to_db(&self) -> Result<Vec<u8>> {
-        Ok(to_stdvec(&self.value)?)
+    fn value_to_db(value: &Value) -> Result<Vec<u8>> {
+        Ok(to_stdvec(value)?)
     }
 
     fn key(&self) -> Result<Vec<u8>> {

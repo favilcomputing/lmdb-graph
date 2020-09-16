@@ -82,13 +82,14 @@ where
     Value: Serialize,
 {
     type Key = LogId;
+    type Value = Value;
 
     fn rev_to_db(&self) -> Result<Vec<u8>> {
         Ok(to_stdvec(&(&self.value, &self.id.unwrap()))?)
     }
 
-    fn value_to_db(&self) -> Result<Vec<u8>> {
-        Ok(to_stdvec(&self.value)?)
+    fn value_to_db(value: &Value) -> Result<Vec<u8>> {
+        Ok(to_stdvec(value)?)
     }
     fn key(&self) -> Result<Vec<u8>> {
         Ok(to_stdvec(&self.id)?)
