@@ -1,8 +1,8 @@
 use postcard::{from_bytes, to_stdvec};
 use serde::{de::DeserializeOwned, Deserialize, Serialize};
 
-use super::{FromDB, LogId, ToDB};
-use crate::error::Result;
+use super::{FromDB, LogId, Node, ToDB};
+use crate::error::{Error, Result};
 use heed::{BytesDecode, BytesEncode};
 use std::borrow::Cow;
 
@@ -53,13 +53,17 @@ impl<Value> Edge<Value>
 where
     Value: Serialize + DeserializeOwned + Clone,
 {
-    pub fn new(to: LogId, from: LogId, value: Value) -> Result<Self> {
-        Ok(Self {
-            id: None,
-            to,
-            from,
-            value,
-        })
+    pub fn new<NodeT>(to: &Node<NodeT>, from: &Node<NodeT>, value: Value) -> Result<Self> {
+        if to.id.is_none() || from.id.is_none() {
+            Err(Error::NodeInvalid)
+        } else {
+            Ok(Self {
+                id: None,
+                to: to.id.unwrap(),
+                from: from.id.unwrap(),
+                value,
+            })
+        }
     }
 
     pub fn get_value(&self) -> Value {
