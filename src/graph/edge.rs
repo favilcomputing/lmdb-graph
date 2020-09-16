@@ -1,0 +1,137 @@
+use postcard::{from_bytes, to_stdvec};
+use serde::{de::DeserializeOwned, Deserialize, Serialize};
+
+use super::{FromDB, LogId, ToDB};
+use crate::error::Result;
+
+#[derive(Debug, PartialEq, Clone, Copy, Serialize, Deserialize)]
+pub(crate) enum HexOrder {
+    TFE,
+    FTE,
+    ETF,
+    EFT,
+    TEF,
+    FET,
+}
+
+#[allow(dead_code)]
+pub(crate) static ORDERS: [HexOrder; 6] = [
+    HexOrder::TFE,
+    HexOrder::FTE,
+    HexOrder::ETF,
+    HexOrder::EFT,
+    HexOrder::TEF,
+    HexOrder::FET,
+];
+
+impl HexOrder {
+    #[allow(dead_code)]
+    pub(crate) fn to_db(&self, id: LogId, to: LogId, from: LogId) -> Result<Vec<u8>> {
+        let value = match self {
+            HexOrder::TFE => (Self::TFE, to, from, id),
+            HexOrder::FTE => (Self::FTE, from, to, id),
+            HexOrder::ETF => (Self::ETF, id, to, from),
+            HexOrder::EFT => (Self::EFT, id, from, to),
+            HexOrder::TEF => (Self::TEF, to, id, from),
+            HexOrder::FET => (Self::FET, from, id, to),
+        };
+        Ok(to_stdvec(&value)?)
+    }
+}
+
+#[derive(Debug, PartialEq, Clone, Serialize, Deserialize)]
+pub struct Edge<Value> {
+    pub(crate) id: Option<LogId>,
+    pub(crate) to: LogId,
+    pub(crate) from: LogId,
+    pub(crate) value: Value,
+}
+
+impl<Value> Edge<Value>
+where
+    Value: Serialize + DeserializeOwned + Clone,
+{
+    pub fn new(to: LogId, from: LogId, value: Value) -> Result<Self> {
+        Ok(Self {
+            id: None,
+            to,
+            from,
+            value,
+        })
+    }
+
+    pub fn get_value(&self) -> Value {
+        self.value.clone()
+    }
+}
+
+impl<Value> FromDB<Value> for Edge<Value>
+where
+    Value: DeserializeOwned,
+{
+    type Key = LogId;
+
+    fn rev_from_db(data: &[u8]) -> Result<Self>
+    where
+        Self: Sized,
+        Value: DeserializeOwned,
+    {
+        let (edge, id): (Edge<Value>, LogId) = from_bytes(data)?;
+        Ok(Self {
+            id: Some(id),
+            ..edge
+        })
+    }
+
+    fn key_from_db(key: &[u8]) -> Result<Self::Key>
+    where
+        Self: Sized,
+        Value: DeserializeOwned,
+    {
+        Ok(from_bytes(key)?)
+    }
+}
+
+impl<Value> ToDB for Edge<Value>
+where
+    Value: Serialize,
+{
+    type Key = LogId;
+
+    fn rev_to_db(&self) -> Result<Vec<u8>> {
+        Ok(to_stdvec(&self)?)
+    }
+
+    fn value_to_db(&self) -> Result<Vec<u8>> {
+        Ok(to_stdvec(&self.value)?)
+    }
+
+    fn key(&self) -> Result<Vec<u8>> {
+        Ok(to_stdvec(&self.id)?)
+    }
+
+    fn key_to_db(key: &Self::Key) -> Result<Vec<u8>> {
+        Ok(to_stdvec(&key)?)
+    }
+}
+
+#[cfg(test)]
+mod tests {
+    use rstest::rstest;
+
+    use super::*;
+
+    #[rstest]
+    fn test_serialize() -> Result<()> {
+        let value = "Testing".to_string();
+
+        let mut edge = Edge::new(LogId::nil(), LogId::nil(), value.clone())?;
+        edge.id = Some(LogId::nil());
+        assert_eq!(edge.get_value(), value);
+        // assert_eq!(
+        //     Edge::<String>::rev_from_db(edge.rev_to_db()?.as_slice())?,
+        //     edge
+        // );
+        Ok(())
+    }
+}

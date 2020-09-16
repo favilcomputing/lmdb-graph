@@ -1,5 +1,4 @@
-use lmdb_zero;
-use rmp_serde::{decode, encode};
+use heed;
 use ulid::DecodeError;
 
 use std::io;
@@ -12,36 +11,20 @@ pub type Result<T> = result::Result<T, Error>;
 #[derive(Debug)]
 pub enum Error {
     NotFound(LogId),
+    ValueNotFound,
 
-    Encode(encode::Error),
-    Decode(decode::Error),
+    Postcard(postcard::Error),
     Ulid(DecodeError),
     Internal(InternalError),
+    UsedArc,
 }
 
 #[derive(Debug)]
 pub enum InternalError {
     IoError(io::Error),
-    Lmdb(lmdb_zero::error::Error),
+    UlidOverflow,
+    Heed(heed::Error),
     BadWrite,
-}
-
-impl From<decode::Error> for Error {
-    fn from(e: decode::Error) -> Self {
-        Self::Decode(e)
-    }
-}
-
-impl From<encode::Error> for Error {
-    fn from(e: encode::Error) -> Self {
-        Self::Encode(e)
-    }
-}
-
-impl From<lmdb_zero::error::Error> for Error {
-    fn from(e: lmdb_zero::error::Error) -> Self {
-        Self::Internal(InternalError::Lmdb(e))
-    }
 }
 
 impl From<io::Error> for Error {
@@ -53,5 +36,23 @@ impl From<io::Error> for Error {
 impl From<DecodeError> for Error {
     fn from(e: DecodeError) -> Self {
         Self::Ulid(e)
+    }
+}
+
+impl From<heed::Error> for Error {
+    fn from(e: heed::Error) -> Self {
+        Self::Internal(InternalError::Heed(e))
+    }
+}
+
+impl From<ulid::MonotonicError> for Error {
+    fn from(_: ulid::MonotonicError) -> Self {
+        Self::Internal(InternalError::UlidOverflow)
+    }
+}
+
+impl From<postcard::Error> for Error {
+    fn from(e: postcard::Error) -> Self {
+        Self::Postcard(e)
     }
 }
