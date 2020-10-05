@@ -22,7 +22,7 @@ fn main() -> Result<()> {
     env_logger::init();
 
     log::info!("Setting up graph");
-    fs::create_dir_all("test.db")?;
+    fs::create_dir_all("test.mdb")?;
     let graph = Graph::new("test.db")?;
     let mut txn = graph.write_txn()?;
     let n = graph.get_node_by_value(&txn, &NodeType::Name("Phineas".to_string()))?;
@@ -30,19 +30,21 @@ fn main() -> Result<()> {
         log::info!("Phineas found, clearing database");
         graph.clear(&mut txn)?;
     }
-    let _phineas = graph.put_node(&mut txn, Node::new(NodeType::Name("Phineas".to_string()))?)?;
-    let _ferb = graph.put_node(&mut txn, Node::new(NodeType::Name("Ferb".to_string()))?)?;
-    graph.put_node(&mut txn, Node::new(NodeType::Name("Candace".to_string()))?)?;
-    graph.put_node(&mut txn, Node::new(NodeType::Name("Isabella".to_string()))?)?;
+    let phineas = graph.put_node(&mut txn, &Node::new(NodeType::Name("Phineas".to_string()))?)?;
+    let ferb = graph.put_node(&mut txn, &Node::new(NodeType::Name("Ferb".to_string()))?)?;
+    graph.put_node(&mut txn, &Node::new(NodeType::Name("Candace".to_string()))?)?;
+    graph.put_node(
+        &mut txn,
+        &Node::new(NodeType::Name("Isabella".to_string()))?,
+    )?;
 
-    // let edge = Edge::new(
-    //     phineas.get_id().unwrap(),
-    //     ferb.get_id().unwrap(),
-    //     EdgeType::Sibling,
-    //     (),
-    // )?;
+    let edge = Edge::new(
+        &phineas,
+        &ferb,
+        EdgeType::Sibling,
+    )?;
 
-    // txn.put_edge(edge)?;
+    graph.put_edge(&mut txn, &edge)?;
 
     txn.commit()?;
 

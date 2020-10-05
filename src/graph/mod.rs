@@ -62,9 +62,10 @@ pub trait FromDB<Value> {
 
 pub trait ToDB {
     type Key: Serialize + DeserializeOwned;
+    type Value: Serialize;
 
     fn rev_to_db(&self) -> Result<Vec<u8>>;
-    fn value_to_db(&self) -> Result<Vec<u8>>;
+    fn value_to_db(value: &Self::Value) -> Result<Vec<u8>>;
     fn key(&self) -> Result<Vec<u8>>;
     fn key_to_db(key: &Self::Key) -> Result<Vec<u8>>;
 }

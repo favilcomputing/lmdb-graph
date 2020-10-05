@@ -12,6 +12,7 @@ pub type Result<T> = result::Result<T, Error>;
 pub enum Error {
     NotFound(LogId),
     ValueNotFound,
+    NodeInvalid,
 
     Postcard(postcard::Error),
     Ulid(DecodeError),
