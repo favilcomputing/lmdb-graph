@@ -2,58 +2,48 @@ use heed;
 use ulid::DecodeError;
 
 use std::io;
-use std::result;
+use std::{result, time::Duration};
 
 use crate::graph::LogId;
 
 pub type Result<T> = result::Result<T, Error>;
 
-#[derive(Debug)]
+#[non_exhaustive]
+#[derive(Debug, thiserror::Error)]
 pub enum Error {
+    #[error("not found {0:?}")]
     NotFound(LogId),
+
+    #[error("value not found")]
     ValueNotFound,
+
+    #[error("invalid node")]
     NodeInvalid,
 
-    Postcard(postcard::Error),
+    #[error("error with serialization {0}")]
+    Postcard(#[from] postcard::Error),
+
+    #[error("ulid decode error {0}")]
     Ulid(DecodeError),
-    Internal(InternalError),
-    UsedArc,
-}
 
-#[derive(Debug)]
-pub enum InternalError {
-    IoError(io::Error),
+    #[error("io error {0}")]
+    IoError(#[from] io::Error),
+
+    #[error("ulid overflow error")]
     UlidOverflow,
-    Heed(heed::Error),
+
+    #[error("heed error {0}")]
+    Heed(#[from] heed::Error),
+
+    #[error("bad write")]
     BadWrite,
-}
 
-impl From<io::Error> for Error {
-    fn from(e: io::Error) -> Self {
-        Self::Internal(InternalError::IoError(e))
-    }
-}
-
-impl From<DecodeError> for Error {
-    fn from(e: DecodeError) -> Self {
-        Self::Ulid(e)
-    }
-}
-
-impl From<heed::Error> for Error {
-    fn from(e: heed::Error) -> Self {
-        Self::Internal(InternalError::Heed(e))
-    }
+    #[error("timed out waiting for transaction {0:?}")]
+    TimedOut(Duration),
 }
 
 impl From<ulid::MonotonicError> for Error {
     fn from(_: ulid::MonotonicError) -> Self {
-        Self::Internal(InternalError::UlidOverflow)
-    }
-}
-
-impl From<postcard::Error> for Error {
-    fn from(e: postcard::Error) -> Self {
-        Self::Postcard(e)
+        Self::UlidOverflow
     }
 }
