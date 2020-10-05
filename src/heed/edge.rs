@@ -22,7 +22,7 @@ where
             }
             edge.clone()
         } else {
-            let id = LogId::new(&mut self.generator.lock().unwrap())?;
+            let id = LogId::new(&mut self.generator.lock())?;
             Edge {
                 id: Some(id),
                 ..edge.clone()

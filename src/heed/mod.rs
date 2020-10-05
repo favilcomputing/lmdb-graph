@@ -3,7 +3,8 @@ pub mod node;
 
 use heed::{types::OwnedSlice, Database, Env, EnvOpenOptions, RoTxn, RwTxn};
 use serde::{de::DeserializeOwned, Serialize};
-use std::{fmt::Debug, ops::Deref, path::Path, sync::Mutex};
+use std::{fmt::Debug, ops::Deref, path::Path};
+use parking_lot::Mutex;
 
 use crate::{
     error::Result,

@@ -21,7 +21,7 @@ where
             }
             n.clone()
         } else {
-            let id = LogId::new(&mut self.generator.lock().unwrap())?;
+            let id = LogId::new(&mut self.generator.lock())?;
             Node {
                 id: Some(id),
                 ..n.clone()

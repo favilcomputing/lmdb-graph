@@ -19,6 +19,7 @@ supercow = "0.1.0"
 ulid = { version = "0.4.0", features = ["serde"] }
 postcard = { version = "0.5.1", features = ["use-std"] }
 tempfile = "3.1.0"
+parking_lot = "0.11.0"
 
 [dependencies.heed]
 version = "0.8.1"
