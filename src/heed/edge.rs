@@ -150,12 +150,10 @@ mod tests {
     fn tmpdir() -> TempDir {
         TempDir::new().unwrap()
     }
-
     #[fixture]
     fn graph(tmpdir: TempDir) -> Graph<String, String> {
         Graph::new(tmpdir.path()).unwrap()
     }
-
     struct Pair(Node<String>, Node<String>);
 
     #[fixture]
