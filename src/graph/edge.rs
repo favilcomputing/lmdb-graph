@@ -154,17 +154,17 @@ mod tests {
 
     use super::*;
 
-    #[rstest]
-    fn test_serialize() -> Result<()> {
-        let value = "Testing".to_string();
+    // #[rstest]
+    // fn test_serialize() -> Result<()> {
+    //     let value = "Testing".to_string();
 
-        let mut edge = Edge::new(LogId::nil(), LogId::nil(), value.clone())?;
-        edge.id = Some(LogId::nil());
-        assert_eq!(edge.get_value(), value);
-        // assert_eq!(
-        //     Edge::<String>::rev_from_db(edge.rev_to_db()?.as_slice())?,
-        //     edge
-        // );
-        Ok(())
-    }
+    //     let mut edge = Edge::new(LogId::nil(), LogId::nil(), value.clone())?;
+    //     edge.id = Some(LogId::nil());
+    //     assert_eq!(edge.get_value(), value);
+    //     // assert_eq!(
+    //     //     Edge::<String>::rev_from_db(edge.rev_to_db()?.as_slice())?,
+    //     //     edge
+    //     // );
+    //     Ok(())
+    // }
 }

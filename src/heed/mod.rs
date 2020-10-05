@@ -35,7 +35,10 @@ where
     EdgeT: Clone + Serialize + DeserializeOwned,
 {
     pub fn new<T: AsRef<Path>>(path: T) -> Result<Self> {
-        let env = EnvOpenOptions::new().max_dbs(200).open(path)?;
+        let env = EnvOpenOptions::new()
+            .max_dbs(200)
+            .map_size(2<<40)
+            .open(path)?;
         let generator = Mutex::new(Generator::new());
         let node_db = env.create_database(Some("nodes:v1"))?;
         let node_idx_db = env.create_database(Some("nodes_idx:v1"))?;

@@ -39,8 +39,8 @@ fn main() -> Result<()> {
     )?;
 
     let edge = Edge::new(
-        phineas.get_id().unwrap(),
-        ferb.get_id().unwrap(),
+        &phineas,
+        &ferb,
         EdgeType::Sibling,
     )?;
 

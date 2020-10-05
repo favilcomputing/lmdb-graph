@@ -136,7 +136,7 @@ impl<'txn, Value> EdgeRange<'txn, Value> {
 #[cfg(test)]
 mod tests {
     use rstest::{fixture, rstest};
-    use tempdir::TempDir;
+    use tempfile::{tempdir, TempDir};
 
     use super::*;
     use crate::graph::Node;
@@ -148,7 +148,7 @@ mod tests {
 
     #[fixture]
     fn tmpdir() -> TempDir {
-        TempDir::new("test").unwrap()
+        TempDir::new().unwrap()
     }
     #[fixture]
     fn graph(tmpdir: TempDir) -> Graph<String, String> {
@@ -176,8 +176,8 @@ mod tests {
         let edge = graph.put_edge(
             &mut txn,
             &Edge::new(
-                ferb.get_id().unwrap(),
-                phineas.get_id().unwrap(),
+                &ferb,
+                &phineas,
                 "brothers".into(),
             )?,
         )?;
@@ -199,8 +199,8 @@ mod tests {
         let edge = graph.put_edge(
             &mut txn,
             &Edge::new(
-                ferb.get_id().unwrap(),
-                phineas.get_id().unwrap(),
+                &ferb,
+                &phineas,
                 value.clone(),
             )?,
         )?;
@@ -226,8 +226,8 @@ mod tests {
             returned.push(graph.put_edge(
                 &mut txn,
                 &Edge::new(
-                    ferb.get_id().unwrap(),
-                    phineas.get_id().unwrap(),
+                    &ferb,
+                    &phineas,
                     format!("test {}", i).into(),
                 )?,
             )?);
@@ -248,8 +248,8 @@ mod tests {
 
         let value: String = "brothers".into();
         let edge = &Edge::new(
-            ferb.get_id().unwrap(),
-            phineas.get_id().unwrap(),
+            &ferb,
+            &phineas,
             value.clone(),
         )?;
 

@@ -136,7 +136,7 @@ mod tests {
     use rstest::{fixture, rstest};
 
     use super::*;
-    use tempdir::TempDir;
+    use tempfile::TempDir;
 
     #[allow(dead_code)]
     fn init() {
@@ -145,7 +145,7 @@ mod tests {
 
     #[fixture]
     fn tmpdir() -> TempDir {
-        TempDir::new("test").unwrap()
+        TempDir::new().unwrap()
     }
     #[fixture]
     fn graph(tmpdir: TempDir) -> Graph<String, String> {
