@@ -2,3 +2,4 @@
 Cargo.lock
 test.db/
 test.mdb/
+tarpaulin-report.html
