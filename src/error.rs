@@ -40,6 +40,9 @@ pub enum Error {
 
     #[error("timed out waiting for transaction {0:?}")]
     TimedOut(Duration),
+
+    #[error("database is busy")]
+    Busy,
 }
 
 impl From<ulid::MonotonicError> for Error {

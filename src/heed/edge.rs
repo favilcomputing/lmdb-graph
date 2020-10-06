@@ -136,7 +136,7 @@ impl<'txn, Value> EdgeRange<'txn, Value> {
 #[cfg(test)]
 mod tests {
     use rstest::{fixture, rstest};
-    use tempfile::{tempdir, TempDir};
+    use tempfile::TempDir;
 
     use super::*;
     use crate::graph::Node;
@@ -175,14 +175,7 @@ mod tests {
     fn test_edge_put(graph: Graph<String, String>, nodes: Pair) -> Result<()> {
         let Pair(ferb, phineas) = nodes;
         let mut txn = graph.write_txn()?;
-        let edge = graph.put_edge(
-            &mut txn,
-            &Edge::new(
-                &ferb,
-                &phineas,
-                "brothers".into(),
-            )?,
-        )?;
+        let edge = graph.put_edge(&mut txn, &Edge::new(&ferb, &phineas, "brothers".into())?)?;
         txn.commit()?;
 
         let txn = graph.read_txn()?;
@@ -198,14 +191,7 @@ mod tests {
         let Pair(ferb, phineas) = nodes;
         let mut txn = graph.write_txn()?;
         let value: String = "brothers".into();
-        let edge = graph.put_edge(
-            &mut txn,
-            &Edge::new(
-                &ferb,
-                &phineas,
-                value.clone(),
-            )?,
-        )?;
+        let edge = graph.put_edge(&mut txn, &Edge::new(&ferb, &phineas, value.clone())?)?;
         txn.commit()?;
 
         let txn = graph.read_txn()?;
@@ -227,11 +213,7 @@ mod tests {
         for i in 0..10 {
             returned.push(graph.put_edge(
                 &mut txn,
-                &Edge::new(
-                    &ferb,
-                    &phineas,
-                    format!("test {}", i).into(),
-                )?,
+                &Edge::new(&ferb, &phineas, format!("test {}", i).into())?,
             )?);
         }
         txn.commit()?;
@@ -249,11 +231,7 @@ mod tests {
         let mut txn = graph.write_txn()?;
 
         let value: String = "brothers".into();
-        let edge = &Edge::new(
-            &ferb,
-            &phineas,
-            value.clone(),
-        )?;
+        let edge = &Edge::new(&ferb, &phineas, value.clone())?;
 
         let mut returned = graph.put_edge(&mut txn, &edge.clone())?;
         returned.value = "sisters".to_string();
