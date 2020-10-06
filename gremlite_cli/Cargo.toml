@@ -1,0 +1,16 @@
+[package]
+name = "gremlite_cli"
+description = "Helper cli to inspect gremlite databases"
+version = "0.1.0"
+authors = ["Kevin Oberlies <favilo@gmail.com>"]
+edition = "2018"
+license = "MIT"
+repository = "https://github.com/favilo/lmdb-graph"
+keywords = ["lmdb", "graph", "database", "graphdb", "heed"]
+
+categories = ["database-implementations", "database"]
+publish = false
+
+# See more keys and their definitions at https://doc.rust-lang.org/cargo/reference/manifest.html
+
+[dependencies]
