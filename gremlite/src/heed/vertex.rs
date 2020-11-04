@@ -1,5 +1,5 @@
 use heed::{RoIter, RoRange, RoTxn, RwTxn};
-use std::{clone::Clone, fmt::Debug, marker::PhantomData, ops::Deref};
+use std::{clone::Clone, fmt::Debug, marker::PhantomData};
 
 use super::{Graph, IdParam, LabelId, ParamId};
 use crate::{

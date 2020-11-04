@@ -5,27 +5,13 @@ use heed::{BytesDecode, BytesEncode, Database, Env, EnvOpenOptions, RoTxn, RwTxn
 use parking_lot::Mutex;
 use postcard::{from_bytes, to_stdvec};
 use serde::{de::DeserializeOwned, Deserialize, Serialize};
-use std::{
-    borrow::Cow,
-    cell::{Ref, RefCell},
-    fmt::Debug,
-    ops::Deref,
-    path::Path,
-    sync::Arc,
-    time::Duration,
-};
+use std::{borrow::Cow, fmt::Debug, path::Path, time::Duration};
 use tracing::instrument;
 
 use crate::{
     error::{Error, Result},
-    graph::{
-        parameter::{FromPValue, PValue},
-        Edge, Id, Vertex, Writable,
-    },
-    gremlin::{
-        terminator::{Terminator, TraversalTerminator},
-        GraphTraversalSource,
-    },
+    graph::{parameter::PValue, Edge, Id, Vertex, Writable},
+    gremlin::{terminator::TraversalTerminator, GraphTraversalSource},
 };
 
 use ulid::Generator;

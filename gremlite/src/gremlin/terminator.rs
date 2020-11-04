@@ -1,7 +1,7 @@
-use super::{bytecode::Bytecode, executor::WriteExecutor, GraphTraversal};
+use super::{bytecode::Bytecode, executor::WriteExecutor};
 use crate::{
-    error::{Error, Result},
-    graph::{parameter::FromPValue, PValue, Writable},
+    error::Result,
+    graph::{parameter::FromPValue, Writable},
     heed::Graph,
 };
 use heed::RwTxn;
@@ -26,6 +26,7 @@ where
     where
         'graph: 'txn;
 
+    // TODO: Make these work
     // fn next<'txn, Start, Term>(
     //     &self,
     //     txn: &'txn mut RwTxn<'txn>,

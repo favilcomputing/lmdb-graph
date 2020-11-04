@@ -3,13 +3,13 @@ pub(crate) mod executor;
 pub(crate) mod terminator;
 
 use crate::{
-    graph::{parameter::FromPValue, Ids, PValue, Vertex, Writable},
+    graph::{Ids, PValue, Writable},
     gremlin::{bytecode::Bytecode, terminator::Terminator},
     heed::Graph,
 };
 use bytecode::Instruction;
 use heed::RwTxn;
-use std::{fmt::Debug, marker::PhantomData};
+use std::fmt::Debug;
 use terminator::TraversalTerminator;
 
 pub trait TraversalSource<'graph, V, E, P>
@@ -93,7 +93,7 @@ where
     E: 'static + Writable,
     P: 'static + Writable,
 {
-    fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
+    fn fmt(&self, _f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
         todo!()
     }
 }
