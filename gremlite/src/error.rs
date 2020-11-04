@@ -1,10 +1,9 @@
-use heed;
 use ulid::DecodeError;
 
 use std::io;
 use std::{result, time::Duration};
 
-use crate::graph::LogId;
+use crate::graph::Id;
 
 pub type Result<T> = result::Result<T, Error>;
 
@@ -12,13 +11,16 @@ pub type Result<T> = result::Result<T, Error>;
 #[derive(Debug, thiserror::Error)]
 pub enum Error {
     #[error("not found {0:?}")]
-    NotFound(LogId),
+    NotFound(Id),
 
     #[error("value not found")]
     ValueNotFound,
 
-    #[error("invalid node")]
-    NodeInvalid,
+    #[error("invalid vertex")]
+    VertexInvalid,
+
+    #[error("empty traversal")]
+    EmptyTraversal,
 
     #[error("error with serialization {0}")]
     Postcard(#[from] postcard::Error),
@@ -43,6 +45,9 @@ pub enum Error {
 
     #[error("database is busy")]
     Busy,
+
+    #[error("Invalid PValue {0}")]
+    InvalidPValue(String)
 }
 
 impl From<ulid::MonotonicError> for Error {
