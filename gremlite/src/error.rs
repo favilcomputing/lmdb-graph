@@ -47,7 +47,7 @@ pub enum Error {
     Busy,
 
     #[error("Invalid PValue {0}")]
-    InvalidPValue(String)
+    InvalidPValue(String),
 }
 
 impl From<ulid::MonotonicError> for Error {
