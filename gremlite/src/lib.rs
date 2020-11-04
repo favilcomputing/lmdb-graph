@@ -1,4 +1,5 @@
-#![warn(clippy::all, clippy::nursery, clippy::cargo)]
+#![warn(clippy::all, clippy::nursery)]
+#![allow(clippy::complexity::type_complexity)]
 
 pub mod error;
 pub mod graph;

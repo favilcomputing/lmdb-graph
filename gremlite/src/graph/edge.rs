@@ -1,7 +1,10 @@
 use postcard::{from_bytes, to_stdvec};
 use serde::{de::DeserializeOwned, Deserialize, Serialize};
 
-use super::{parameter::{FromPValue, PValue, ToPValue}, FromDB, Id, ToDB, Vertex, Writable};
+use super::{
+    parameter::{FromPValue, PValue, ToPValue},
+    FromDB, Id, ToDB, Vertex, Writable,
+};
 use crate::error::{Error, Result};
 use heed::{BytesDecode, BytesEncode};
 use std::{borrow::Cow, clone::Clone, collections::HashMap};

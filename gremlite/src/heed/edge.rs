@@ -34,7 +34,7 @@ where
         self.edge_idx_db.put(txn, rev, e.id.as_ref().unwrap())?;
         e.parameters.iter().for_each(|(k, v)| {
             self.parameters_db
-                .put(txn, &IdParam(e.id.unwrap(), k.clone()), &v)
+                .put(txn, &IdParam(e.id.unwrap(), k.clone()), v)
                 .unwrap();
             self.parameters_idx_db
                 .put(txn, &ParamId(k.clone(), e.id.unwrap()), &e.id.unwrap())
