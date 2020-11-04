@@ -215,7 +215,7 @@ mod tests {
         gremlin::TraversalSource,
     };
     use parking::Parker;
-    use std::{sync::Arc, thread::JoinHandle};
+    use std::{collections::HashSet, sync::Arc, thread::JoinHandle};
 
     #[fixture]
     fn tmpdir() -> TempDir {
@@ -310,10 +310,13 @@ mod tests {
             .map(Result::unwrap)
             .collect();
         assert_eq!(vertices.len(), 2);
-        let vertex_values: Vec<String> = vertices.iter().map(|n| n.get_label()).collect();
-        let vertex_ids: Vec<Option<Id>> = vertices.iter().map(|n| n.get_id()).collect();
-        assert_eq!(vertex_values, vec!["n1", "n2"]);
-        assert_eq!(vertex_ids, vec![v1.get_id(), v2.get_id()]);
+        let vertex_values: HashSet<String> = vertices.iter().map(|n| n.get_label()).collect();
+        let vertex_ids: HashSet<Option<Id>> = vertices.iter().map(|n| n.get_id()).collect();
+        let expected_values: HashSet<String> =
+            ["n1", "n2"].iter().cloned().map(String::from).collect();
+        assert_eq!(vertex_values, expected_values);
+        let expected_ids = [v1.get_id(), v2.get_id()].iter().cloned().collect();
+        assert_eq!(vertex_ids, expected_ids);
 
         Ok(())
     }
