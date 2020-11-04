@@ -9,7 +9,7 @@ use super::bytecode::{self, Instruction};
 use heed::RwTxn;
 use std::marker::PhantomData;
 
-pub(crate) struct WriteExecutor<'graph, End, V, E, P>
+pub struct WriteExecutor<'graph, End, V, E, P>
 where
     V: 'static + Writable,
     E: 'static + Writable,

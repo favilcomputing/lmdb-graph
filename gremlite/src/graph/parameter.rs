@@ -109,7 +109,7 @@ where
     E: Writable,
     P: Writable,
 {
-    fn from_pvalue(v: PValue<V, E, P>) -> Result<Self> {
+    fn from_pvalue(v: Self) -> Result<Self> {
         Ok(v)
     }
 }
@@ -129,7 +129,7 @@ where
     E: Writable,
     P: Writable,
 {
-    fn to_pvalue(&self) -> PValue<V, E, P> {
+    fn to_pvalue(&self) -> Self {
         self.clone()
     }
 }

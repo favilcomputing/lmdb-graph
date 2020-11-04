@@ -191,8 +191,8 @@ where
         Ok(())
     }
 
-    pub fn traversal<'graph>(&'graph self) -> GraphTraversalSource<'graph, V, E, P> {
-        GraphTraversalSource::new(&self)
+    pub fn traversal(&self) -> GraphTraversalSource<V, E, P> {
+        GraphTraversalSource::new(self)
     }
 
     pub(crate) fn terminator(&self) -> TraversalTerminator<V, E, P> {

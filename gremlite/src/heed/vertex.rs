@@ -33,7 +33,7 @@ where
         self.vertex_idx_db.put(txn, rev, n.id.as_ref().unwrap())?;
         n.parameters.iter().for_each(|(k, v)| {
             self.parameters_db
-                .put(txn, &IdParam(n.id.unwrap(), k.clone()), &v)
+                .put(txn, &IdParam(n.id.unwrap(), k.clone()), v)
                 .unwrap();
             self.parameters_idx_db
                 .put(txn, &ParamId(k.clone(), n.id.unwrap()), &n.id.unwrap())
@@ -77,7 +77,7 @@ where
         let range = LabelId(label.clone(), Id::nil(Type::Vertex))
             ..=LabelId(label.clone(), Id::max(Type::Vertex));
         let iter: RoRange<LabelId<V>, Id> = self.vertex_idx_db.range(txn, &range)?;
-        Ok(VertexRange::new(&self, txn, iter))
+        Ok(VertexRange::new(self, txn, iter))
     }
 
     pub fn get_vertex_by_label<'txn>(
