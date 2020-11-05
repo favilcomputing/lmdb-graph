@@ -144,86 +144,70 @@ where
     }
 }
 
-impl<V, E, P> FromDB<E> for Edge<V, E, P>
-where
-    V: Writable,
-    E: Writable,
-    P: Writable,
-{
-    type Key = Id;
-
-    fn rev_from_db(data: &[u8]) -> Result<Self>
-    where
-        Self: Sized,
-        E: DeserializeOwned,
-    {
-        let (label, to, from, id): (E, Id, Id, Id) = from_bytes(data)?;
-        Ok(Self {
-            id: Some(id),
-            to,
-            from,
-            label,
-            parameters: Default::default(),
-        })
-    }
-
-    fn key_from_db(key: &[u8]) -> Result<Self::Key>
-    where
-        Self: Sized,
-        E: DeserializeOwned,
-    {
-        Ok(from_bytes(key)?)
-    }
-}
-
-impl<V, E, P> ToDB for Edge<V, E, P>
-where
-    V: Writable,
-    E: Writable,
-    P: Writable,
-{
-    type Key = Id;
-    type Label = E;
-
-    fn rev_to_db(&self) -> Result<Vec<u8>> {
-        Ok(to_stdvec(&(
-            &self.label,
-            &self.to,
-            &self.from,
-            &self.id.unwrap(),
-        ))?)
-    }
-
-    fn label_to_db(label: &E) -> Result<Vec<u8>> {
-        Ok(to_stdvec(label)?)
-    }
-
-    fn key(&self) -> Result<Vec<u8>> {
-        Ok(to_stdvec(&self.id)?)
-    }
-
-    fn key_to_db(key: &Self::Key) -> Result<Vec<u8>> {
-        Ok(to_stdvec(&key)?)
-    }
-}
-
 #[cfg(test)]
 mod tests {
-    // use rstest::rstest;
+    use rstest::rstest;
 
-    // use super::*;
+    use super::*;
+    use crate::graph::Type;
 
-    // #[rstest]
-    // fn test_serialize() -> Result<()> {
-    //     let value = "Testing".to_string();
+    #[rstest]
+    fn test_none_id() -> Result<()> {
+        let v1 = Vertex::<String, String, String>::new("v".into());
+        let v2 = Vertex::<String, String, String>::new("v".into());
+        let e = Edge::<String, String, String>::new(&v1, &v2, "e".into());
+        assert!(e.is_err());
 
-    //     let mut edge = Edge::new(LogId::nil(), LogId::nil(), value.clone())?;
-    //     edge.id = Some(LogId::nil());
-    //     assert_eq!(edge.get_value(), value);
-    //     // assert_eq!(
-    //     //     Edge::<String>::rev_from_db(edge.rev_to_db()?.as_slice())?,
-    //     //     edge
-    //     // );
-    //     Ok(())
-    // }
+        Ok(())
+    }
+
+    #[rstest]
+    fn test_to_pvalue() -> Result<()> {
+        let mut v1 = Vertex::<String, String, String>::new("v".into());
+        v1.id = Some(Id::nil(Type::Vertex));
+        let mut v2 = Vertex::<String, String, String>::new("v".into());
+        v2.id = Some(Id::max(Type::Vertex));
+        let e = Edge::<String, String, String>::new(&v1, &v2, "e".into())?;
+
+        assert_eq!(e.get_label(), "e");
+
+        let pvalue = e.to_pvalue();
+        let decoded = Edge::from_pvalue(pvalue)?;
+
+        assert_eq!(decoded, e);
+
+        Ok(())
+    }
+
+    #[rstest]
+    fn test_from_pvalue() -> Result<()> {
+        let v1 = Vertex::<String, String, String>::new("v".into());
+        let pvalue = v1.to_pvalue();
+
+        let decoded = Edge::from_pvalue(pvalue);
+
+        assert!(decoded.is_err());
+
+        Ok(())
+    }
+
+    #[rstest]
+    fn test_hex_order() -> Result<()> {
+        let ho = HexOrder::EFT;
+        let computed = ho.to_db(
+            Id::nil(Type::Edge),
+            Id::nil(Type::Vertex),
+            Id::max(Type::Vertex),
+        )?;
+        let expected = to_stdvec(&(
+            HexOrder::EFT,
+            Id::nil(Type::Edge),
+            Id::max(Type::Vertex),
+            Id::nil(Type::Vertex),
+        ))?;
+
+        assert_eq!(computed, expected);
+
+        Ok(())
+    }
 }
