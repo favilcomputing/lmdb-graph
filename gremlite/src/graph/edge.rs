@@ -3,7 +3,7 @@ use serde::{de::DeserializeOwned, Deserialize, Serialize};
 
 use super::{
     parameter::{FromPValue, PValue, ToPValue},
-    FromDB, Id, ToDB, Vertex, Writable,
+    Id, Vertex, Writable,
 };
 use crate::error::{Error, Result};
 use heed::{BytesDecode, BytesEncode};

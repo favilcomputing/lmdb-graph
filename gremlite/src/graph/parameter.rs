@@ -139,7 +139,6 @@ mod tests {
     use rstest::rstest;
 
     use super::*;
-    use crate::graph::Type;
 
     #[rstest]
     fn test_none_id() -> Result<()> {
