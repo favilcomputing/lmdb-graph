@@ -31,13 +31,10 @@ where
     E: Writable,
     P: Writable,
 {
-    pub fn new() -> Self {
-        Default::default()
-    }
-
-    pub fn add_source(&mut self, i: Instruction<V, E, P>) {
-        self.sources.push(i);
-    }
+    // TODO: Uncomment this when it is necessary again
+    // pub fn add_source(&mut self, i: Instruction<V, E, P>) {
+    //     self.sources.push(i);
+    // }
 
     pub fn add_step(&mut self, i: Instruction<V, E, P>) {
         self.steps.push(i);

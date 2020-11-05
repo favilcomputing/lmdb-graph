@@ -4,7 +4,7 @@ use serde::{de::DeserializeOwned, Deserialize, Serialize};
 
 use super::{
     parameter::{FromPValue, PValue, ToPValue},
-    FromDB, Id, ToDB, Writable,
+    Id, Writable,
 };
 use crate::error::{Error, Result};
 use std::{borrow::Cow, clone::Clone, collections::HashMap, fmt::Debug};
@@ -107,67 +107,12 @@ where
     }
 }
 
-impl<V, E, P> FromDB<V> for Vertex<V, E, P>
-where
-    V: Writable,
-    E: Writable,
-    P: Writable,
-{
-    type Key = Id;
-
-    fn rev_from_db(data: &[u8]) -> Result<Self>
-    where
-        Self: Sized,
-        V: DeserializeOwned,
-    {
-        let (label, id): (V, Id) = from_bytes(data)?;
-        Ok(Self {
-            id: Some(id),
-            label,
-            parameters: Default::default(),
-        })
-    }
-
-    fn key_from_db(_key: &[u8]) -> Result<Self::Key>
-    where
-        Self: Sized,
-        V: DeserializeOwned,
-    {
-        // Ok(from_read_ref::<[u8], Self::Key>(key)?)
-        todo!()
-    }
-}
-
-impl<V, E, P> ToDB for Vertex<V, E, P>
-where
-    V: Writable,
-    E: Writable,
-    P: Writable,
-{
-    type Key = Id;
-    type Label = V;
-
-    fn rev_to_db(&self) -> Result<Vec<u8>> {
-        Ok(to_stdvec(&(&self.label, &self.id.unwrap()))?)
-    }
-
-    fn label_to_db(label: &Self::Label) -> Result<Vec<u8>> {
-        Ok(to_stdvec(label)?)
-    }
-    fn key(&self) -> Result<Vec<u8>> {
-        Ok(to_stdvec(&self.id)?)
-    }
-
-    fn key_to_db(key: &Self::Key) -> Result<Vec<u8>> {
-        Ok(to_stdvec(key)?)
-    }
-}
-
 #[cfg(test)]
 mod tests {
     use rstest::rstest;
 
     use super::*;
+    use crate::graph::Type;
 
     #[rstest]
     fn test_serialize() {
@@ -175,5 +120,29 @@ mod tests {
         let vertex = Vertex::<_, (), ()>::new(label.clone());
         assert_eq!(vertex.get_label(), label);
         assert_eq!(vertex.id, None);
+    }
+
+    #[rstest]
+    fn test_to_pvalue() -> Result<()> {
+        let mut v = Vertex::<String, String, String>::new("v".into());
+        v.id = Some(Id::nil(Type::Vertex));
+
+        let pvalue = v.to_pvalue();
+        let decoded = Vertex::from_pvalue(pvalue)?;
+
+        assert_eq!(decoded, v);
+
+        Ok(())
+    }
+
+    #[rstest]
+    fn test_from_pvalue() -> Result<()> {
+        let pvalue = PValue::<String, String, String>::default();
+
+        let decoded = Vertex::from_pvalue(pvalue);
+
+        assert!(decoded.is_err());
+
+        Ok(())
     }
 }

@@ -374,7 +374,7 @@ mod tests {
     }
 
     #[rstest]
-    fn test_traversal(graph: Graph<String, String, ()>) -> Result<()> {
+    fn test_vertex_traversal(graph: Graph<String, String, ()>) -> Result<()> {
         let vertex = Vertex::new("test".to_string());
         let mut txn = graph.write_txn().unwrap();
         let returned = graph.put_vertex(&mut txn, &vertex.clone()).unwrap();
@@ -402,6 +402,43 @@ mod tests {
             g.v(Id::nil(Type::Vertex)).to_list(&mut txn).unwrap()
         };
         assert_eq!(vs.len(), 0);
+
+        Ok(())
+    }
+
+    #[rstest]
+    fn test_edge_traversal(graph: Graph<String, String, ()>) -> Result<()> {
+        let v1 = Vertex::new("test".to_string());
+        let v2 = Vertex::new("test".to_string());
+        let mut txn = graph.write_txn().unwrap();
+        let r1 = graph.put_vertex(&mut txn, &v1.clone()).unwrap();
+        let r2 = graph.put_vertex(&mut txn, &v2.clone()).unwrap();
+        let e = Edge::new(&r1, &r2, "e".into())?;
+        let e = graph.put_edge(&mut txn, &e.clone()).unwrap();
+        txn.commit()?;
+
+        let es = {
+            let g = graph.traversal();
+            let mut txn = graph.write_txn()?;
+            g.e(()).to_list(&mut txn).unwrap()
+        };
+        assert_eq!(es.len(), 1);
+        assert_eq!(es[0], e.to_pvalue());
+
+        let es = {
+            let g = graph.traversal();
+            let mut txn = graph.write_txn()?;
+            g.e(e.id.unwrap()).to_list(&mut txn).unwrap()
+        };
+        assert_eq!(es.len(), 1);
+        assert_eq!(es[0], e.to_pvalue());
+
+        let es = {
+            let g = graph.traversal();
+            let mut txn = graph.write_txn()?;
+            g.e(Id::nil(Type::Vertex)).to_list(&mut txn).unwrap()
+        };
+        assert_eq!(es.len(), 0);
 
         Ok(())
     }

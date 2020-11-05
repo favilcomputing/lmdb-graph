@@ -9,7 +9,7 @@ use std::{borrow::Cow, collections::HashMap};
 use ulid::Ulid;
 
 #[derive(Debug, PartialEq, Clone, Serialize, Deserialize)]
-pub enum PValue<V, E, P>
+pub enum PValue<V = String, E = String, P = String>
 where
     V: Writable,
     E: Writable,
@@ -131,5 +131,22 @@ where
 {
     fn to_pvalue(&self) -> Self {
         self.clone()
+    }
+}
+
+#[cfg(test)]
+mod tests {
+    use rstest::rstest;
+
+    use super::*;
+
+    #[rstest]
+    fn test_none_id() -> Result<()> {
+        let pv = PValue::<String, String, String>::default();
+        assert_eq!(pv, PValue::None);
+
+        assert_eq!(pv, pv.to_pvalue());
+
+        Ok(())
     }
 }
