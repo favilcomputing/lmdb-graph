@@ -27,6 +27,11 @@ where
     where
         T: Into<Ids>,
         'graph: 'a;
+
+    #[allow(non_snake_case)]
+    fn addV<'a>(&'a self, label: V) -> GraphTraversal<'graph, V, E, P>
+    where
+        'graph: 'a;
 }
 
 #[derive(Clone)]
@@ -73,6 +78,15 @@ where
     {
         let mut code = Bytecode::default();
         code.add_step(Instruction::Edge(bytecode::Edge(ids.into())));
+        GraphTraversal::new(TraversalBuilder::new(code), self.graph.terminator())
+    }
+
+    fn addV<'a>(&'a self, label: V) -> GraphTraversal<'graph, V, E, P>
+    where
+        'graph: 'a,
+    {
+        let mut code = Bytecode::default();
+        code.add_step(Instruction::AddV(label));
         GraphTraversal::new(TraversalBuilder::new(code), self.graph.terminator())
     }
 }

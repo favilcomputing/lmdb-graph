@@ -375,10 +375,16 @@ mod tests {
 
     #[rstest]
     fn test_vertex_traversal(graph: Graph<String, String, ()>) -> Result<()> {
-        let vertex = Vertex::new("test".to_string());
-        let mut txn = graph.write_txn().unwrap();
-        let returned = graph.put_vertex(&mut txn, &vertex.clone()).unwrap();
-        txn.commit()?;
+        // TODO: Ugh, messy
+        let returned = {
+            let g = graph.traversal();
+            let mut txn = graph.write_txn().unwrap();
+            let v = g.addV("test".into());
+            let returned = v.to_list(&mut txn).unwrap().clone();
+            txn.commit()?;
+            returned
+        };
+        let returned = Vertex::from_pvalue(returned[0].clone()).unwrap();
 
         let vs = {
             let g = graph.traversal();

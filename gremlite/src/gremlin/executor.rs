@@ -1,6 +1,9 @@
 use crate::{
     error::Result,
-    graph::{parameter::FromPValue, PValue, Vertex, Writable},
+    graph::{
+        parameter::{FromPValue, ToPValue},
+        PValue, Vertex, Writable,
+    },
     gremlin::Bytecode,
     heed::Graph,
 };
@@ -63,8 +66,11 @@ where
                 }
             }
             Instruction::AddV(label) => {
-                self.graph.put_vertex(txn, &Vertex::new(label))?;
-                todo!()
+                let v = self.graph.put_vertex(txn, &Vertex::new(label))?.to_pvalue();
+                Box::new(vec![v].into_iter())
+            }
+            Instruction::AddE(_label) => {
+                todo!(r#"We need to pop more off the stack to get "from" and "to""#)
             }
             _ => todo!(),
         };
