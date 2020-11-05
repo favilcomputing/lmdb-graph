@@ -3,7 +3,8 @@ use postcard::{from_bytes, to_stdvec};
 use serde::{de::DeserializeOwned, Deserialize, Serialize};
 
 use super::{
-    parameter::{FromPValue, PValue, ToPValue}, Id, Writable,
+    parameter::{FromPValue, PValue, ToPValue},
+    Id, Writable,
 };
 use crate::error::{Error, Result};
 use std::{borrow::Cow, clone::Clone, collections::HashMap, fmt::Debug};
