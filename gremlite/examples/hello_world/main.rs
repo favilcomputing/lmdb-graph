@@ -27,8 +27,9 @@ impl Writable for EdgeType {}
 fn main() -> Result<()> {
     env_logger::init();
 
-    log::info!("Setting up graph");
+    log::info!("Creating directory");
     fs::create_dir_all("test.mdb")?;
+    log::info!("Setting up graph");
     let graph = Graph::<_, _, String>::new("test.mdb")?;
     let mut txn = graph.write_txn()?;
     let n = graph.get_vertex_by_label(&txn, &VertexType::Name("Phineas".to_string()))?;
@@ -57,10 +58,8 @@ fn main() -> Result<()> {
     txn.commit()?;
 
     let (vs, es) = graph.write_traversal(|g, mut txn| {
-        let vs = g.v(());
-        let vs = vs.to_list(&mut txn)?;
-        let es = g.e(());
-        let es = es.to_list(&mut txn)?;
+        let vs = g.v(()).to_list(&mut txn)?;
+        let es = g.e(()).to_list(&mut txn)?;
         Ok((vs, es))
     })?;
     for v in vs {

@@ -1,6 +1,6 @@
 use super::{bytecode::Bytecode, executor::WriteExecutor};
 use crate::{
-    error::Result,
+    error::{Error, Result},
     graph::{parameter::FromPValue, Writable},
     heed::Graph,
 };
@@ -26,25 +26,23 @@ where
     where
         'txn: 'a;
 
+    fn next<'a, 'txn>(
+        &'a self,
+        txn: &'txn mut RwTxn<'graph>,
+        traversal: &'txn Bytecode<V, E, P>,
+    ) -> Self::Next
+    where
+        'txn: 'a;
+
+    fn has_next<'a, 'txn>(
+        &'a self,
+        txn: &'txn mut RwTxn<'graph>,
+        traversal: &'txn Bytecode<V, E, P>,
+    ) -> Self::HasNext
+    where
+        'txn: 'a;
+
     // TODO: Make these work
-    // fn next<'txn, Start, Term>(
-    //     &self,
-    //     txn: &'txn mut RwTxn<'txn>,
-    //     traversal: &'txn GraphTraversal<'graph, Start, End, Term, V, E, P>,
-    // ) -> Self::Next
-    // where
-    //     'graph: 'txn,
-    //     Term: Terminator<'graph, End, V, E, P>;
-
-    // fn has_next<'txn, Start, Term>(
-    //     &self,
-    //     txn: &'txn mut RwTxn<'txn>,
-    //     traversal: &GraphTraversal<'graph, Start, End, Term, V, E, P>,
-    // ) -> Self::HasNext
-    // where
-    //     'graph: 'txn,
-    //     Term: Terminator<'graph, End, V, E, P>;
-
     // fn iter<'txn, Start, Term>(
     //     &self,
     //     txn: &'txn mut RwTxn<'txn>,
@@ -103,31 +101,32 @@ where
             .collect())
     }
 
-    // fn next<'txn, Start, Term>(
-    //     &self,
-    //     txn: &'txn mut RwTxn<'txn>,
-    //     traversal: &'txn GraphTraversal<'graph, Start, End, Term, V, E, P>,
-    // ) -> Result<End>
-    // where
-    //     Term: Terminator<'graph, End, V, E, P>,
-    //     'graph: 'txn,
-    // {
-    //     let mut executor: WriteExecutor<'graph, End, V, E, P> = WriteExecutor::new(self.graph);
-    //     let iter = executor.execute(txn, traversal.bytecode())?.next();
-    //     iter.map(End::from_pvalue)
-    //         .unwrap_or_else(|| Err(Error::EmptyTraversal))
-    // }
-    // fn has_next<'txn, Start, Term>(
-    //     &self,
-    //     _txn: &'txn mut RwTxn,
-    //     _traversal: &GraphTraversal<'graph, Start, End, Term, V, E, P>,
-    // ) -> Self::HasNext
-    // where
-    //     'graph: 'txn,
-    //     Term: Terminator<'graph, End, V, E, P>,
-    // {
-    //     todo!()
-    // }
+    fn next<'a, 'txn>(
+        &'a self,
+        txn: &'txn mut RwTxn<'graph>,
+        traversal: &'txn Bytecode<V, E, P>,
+    ) -> Result<End>
+    where
+        'txn: 'a,
+    {
+        let mut executor: WriteExecutor<End, V, E, P> = WriteExecutor::new(self.graph);
+        let iter = executor.execute(txn, traversal)?.next();
+        iter.map(End::from_pvalue)
+            .unwrap_or_else(|| Err(Error::EmptyTraversal))
+    }
+
+    fn has_next<'a, 'txn>(
+        &'a self,
+        _txn: &'txn mut RwTxn<'graph>,
+        _traversal: &'txn Bytecode<V, E, P>,
+    ) -> Self::HasNext
+    where
+        'txn: 'a,
+    {
+        todo!()
+        // let mut executor: WriteExecutor<'graph, End, V, E, P> = WriteExecutor::new(self.graph);
+        // let iter = executor.execute(txn, traversal)?.next();
+    }
     // fn iter<'txn, Start, Term>(
     //     &self,
     //     _txn: &'txn mut RwTxn,

@@ -34,10 +34,10 @@ fn main() -> Result<()> {
     env_logger::init();
 
     log::info!("Setting up environment");
-    fs::create_dir_all(Path::new("test.mdb"))?;
+    fs::create_dir_all(Path::new("cursor.mdb"))?;
 
     log::info!("Creating database");
-    let graph: Graph<VertexType, EdgeType, ParameterType> = Graph::new(Path::new("test.mdb"))?;
+    let graph: Graph<VertexType, EdgeType, ParameterType> = Graph::new(Path::new("cursor.mdb"))?;
     {
         let mut txn = graph.write_txn()?;
         graph.clear(&mut txn)?;

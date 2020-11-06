@@ -388,10 +388,9 @@ mod tests {
     #[rstest]
     fn test_vertex_traversal(graph: Graph<String, String, ()>) -> Result<()> {
         let returned = graph.write_traversal(|g, mut txn| {
-            let v = g.addV("test".into());
-            v.to_list(&mut txn)
+            g.addV("test".into()).next(&mut txn)
         })?;
-        let returned = Vertex::from_pvalue(returned[0].clone()).unwrap();
+        let returned = Vertex::from_pvalue(returned.clone()).unwrap();
 
         let vs = graph.write_traversal(|g, mut txn| g.v(()).to_list(&mut txn))?;
         assert_eq!(vs.len(), 1);

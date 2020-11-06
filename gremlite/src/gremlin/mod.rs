@@ -141,6 +141,14 @@ where
     {
         self.terminator.to_list(txn, self.bytecode())
     }
+
+    pub fn next<'a>(
+        &'a self,
+        txn: &mut RwTxn<'term>,
+    ) -> <TraversalTerminator<'term, V, E, P> as Terminator<'term, PValue<V, E, P>, V, E, P>>::Next
+    {
+        self.terminator.next(txn, self.bytecode())
+    }
 }
 
 #[derive(Debug)]
