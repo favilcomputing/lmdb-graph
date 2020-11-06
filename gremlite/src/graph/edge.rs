@@ -65,13 +65,9 @@ impl<V, E, P> Edge<V, E, P>
 where
     V: Writable,
     E: Writable,
-    P: Writable,
+    P: Writable + Eq,
 {
-    pub fn new(to: &Vertex<V, E, P>, from: &Vertex<V, E, P>, label: E) -> Result<Self>
-    where
-        V: Writable,
-        P: Writable,
-    {
+    pub fn new(to: &Vertex<V, E, P>, from: &Vertex<V, E, P>, label: E) -> Result<Self> {
         if to.id.is_none() || from.id.is_none() {
             Err(Error::VertexInvalid)
         } else {
@@ -94,7 +90,7 @@ impl<V, E, P> FromPValue<V, E, P> for Edge<V, E, P>
 where
     V: 'static + Writable,
     E: 'static + Writable,
-    P: 'static + Writable,
+    P: 'static + Writable + Eq,
 {
     fn from_pvalue(v: PValue<V, E, P>) -> Result<Self> {
         match v {
@@ -108,7 +104,7 @@ impl<V, E, P> ToPValue<V, E, P> for Edge<V, E, P>
 where
     V: 'static + Writable,
     E: 'static + Writable,
-    P: 'static + Writable,
+    P: 'static + Writable + Eq,
 {
     fn to_pvalue(&self) -> PValue<V, E, P> {
         PValue::Edge(self.clone())
@@ -119,7 +115,7 @@ impl<'a, V, E, P> BytesEncode<'a> for Edge<V, E, P>
 where
     V: 'a + Writable,
     E: 'a + Writable,
-    P: 'a + Writable,
+    P: 'a + Writable + Eq,
 {
     type EItem = Self;
 
@@ -135,7 +131,7 @@ impl<'a, V, E, P> BytesDecode<'a> for Edge<V, E, P>
 where
     V: 'a + Writable,
     E: 'a + Writable,
-    P: 'a + Writable,
+    P: 'a + Writable + Eq,
 {
     type DItem = Self;
 

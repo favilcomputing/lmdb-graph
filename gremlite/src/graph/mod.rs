@@ -5,16 +5,24 @@ pub(crate) mod vertex;
 use serde::{de::DeserializeOwned, Deserialize, Serialize};
 use ulid::{Generator, Ulid};
 
-pub use self::{edge::Edge, parameter::PValue, vertex::Vertex};
+pub use self::{
+    edge::Edge,
+    parameter::{FromPValue, PValue, ToPValue},
+    vertex::Vertex,
+};
 use crate::error::Result;
 use heed::{BytesDecode, BytesEncode};
 use postcard::{from_bytes, to_stdvec};
 use std::{borrow::Cow, convert::TryInto, fmt::Debug, hash::Hash};
 
-pub trait Writable: Serialize + DeserializeOwned + Clone + Hash + Debug + PartialEq + Eq {}
+pub trait Writable: Serialize + DeserializeOwned + Clone + Hash + Debug + PartialEq {}
 
 impl Writable for () {}
 impl Writable for String {}
+// impl<V: Writable, E: Writable, P: Writable + Eq> Writable for PValue<V, E, P> {}
+
+impl<T: Writable> Writable for Vec<T> {}
+impl<T: Writable, U: Writable> Writable for (T, U) {}
 
 #[derive(Serialize, Deserialize, PartialEq, PartialOrd, Clone, Copy, Eq, Ord, Hash, Debug)]
 pub enum Type {

@@ -56,16 +56,13 @@ fn main() -> Result<()> {
 
     txn.commit()?;
 
-    let (vs, es) = {
-        let mut txn = graph.write_txn()?;
-        let g = graph.traversal();
-
+    let (vs, es) = graph.write_traversal(|g, mut txn| {
         let vs = g.v(());
-        let vs = vs.to_list(&mut txn)?;
+        let vs = vs.to_list(&mut txn)?.clone();
         let es = g.e(());
-        let es = es.to_list(&mut txn)?;
-        (vs, es)
-    };
+        let es = es.to_list(&mut txn)?.clone();
+        Ok((vs, es))
+    })?;
     for v in vs {
         log::info!("Found vertex: {:#?}", v);
     }

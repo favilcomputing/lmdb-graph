@@ -11,7 +11,7 @@ impl<V, E, P> Graph<V, E, P>
 where
     V: 'static + Writable,
     E: 'static + Writable,
-    P: 'static + Writable,
+    P: 'static + Writable + Eq,
 {
     pub fn put_vertex(&self, txn: &mut RwTxn, n: &Vertex<V, E, P>) -> Result<Vertex<V, E, P>> {
         let n = if n.id.is_some() {
@@ -111,7 +111,7 @@ pub struct VertexIter<'txn, V, E, P>
 where
     V: 'static + Writable,
     E: 'static + Writable,
-    P: 'static + Writable,
+    P: 'static + Writable + Eq,
 {
     pub(crate) iter: RoIter<'txn, Id, Vertex<V, E, P>>,
 }
@@ -120,7 +120,7 @@ impl<'txn, V, E, P> Iterator for VertexIter<'txn, V, E, P>
 where
     V: 'static + Writable,
     E: 'static + Writable,
-    P: 'static + Writable,
+    P: 'static + Writable + Eq,
 {
     type Item = PValue<V, E, P>;
 
@@ -137,7 +137,7 @@ pub struct VertexRange<'txn, V, E, P>
 where
     V: 'static + Writable,
     E: 'static + Writable,
-    P: 'static + Writable,
+    P: 'static + Writable + Eq,
 {
     iter: RoRange<'txn, LabelId<V>, Id>,
     graph: &'txn Graph<V, E, P>,
@@ -149,7 +149,7 @@ impl<'txn, V, E, P> VertexRange<'txn, V, E, P>
 where
     V: Writable,
     E: Writable,
-    P: Writable,
+    P: Writable + Eq,
 {
     pub fn new(
         graph: &'txn Graph<V, E, P>,
@@ -169,7 +169,7 @@ impl<'txn, V, E, P> Iterator for VertexRange<'txn, V, E, P>
 where
     V: 'static + Writable,
     E: 'static + Writable,
-    P: 'static + Writable,
+    P: 'static + Writable + Eq,
 {
     type Item = Vertex<V, E, P>;
 

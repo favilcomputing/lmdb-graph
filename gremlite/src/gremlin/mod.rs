@@ -16,7 +16,7 @@ pub trait TraversalSource<'graph, V, E, P>
 where
     V: 'static + Writable,
     E: 'static + Writable,
-    P: 'static + Writable,
+    P: 'static + Writable + Eq,
 {
     fn v<'a, T>(&'a self, ids: T) -> GraphTraversal<'graph, V, E, P>
     where
@@ -35,31 +35,31 @@ where
 }
 
 #[derive(Clone)]
-pub struct GraphTraversalSource<'graph, V, E, P>
+pub struct RWTraversalSource<'graph, V, E, P>
 where
     V: 'static + Writable,
     E: 'static + Writable,
-    P: 'static + Writable,
+    P: 'static + Writable + Eq,
 {
     graph: &'graph Graph<V, E, P>,
 }
 
-impl<'graph, V, E, P> GraphTraversalSource<'graph, V, E, P>
+impl<'graph, V, E, P> RWTraversalSource<'graph, V, E, P>
 where
     V: 'static + Writable,
     E: 'static + Writable,
-    P: 'static + Writable,
+    P: 'static + Writable + Eq,
 {
     pub fn new(graph: &'graph Graph<V, E, P>) -> Self {
         Self { graph }
     }
 }
 
-impl<'graph, V, E, P> TraversalSource<'graph, V, E, P> for GraphTraversalSource<'graph, V, E, P>
+impl<'graph, V, E, P> TraversalSource<'graph, V, E, P> for RWTraversalSource<'graph, V, E, P>
 where
     V: 'static + Writable,
     E: 'static + Writable,
-    P: 'static + Writable,
+    P: 'static + Writable + Eq,
 {
     fn v<'a, T>(&'a self, ids: T) -> GraphTraversal<'graph, V, E, P>
     where
@@ -95,7 +95,7 @@ pub struct GraphTraversal<'graph, V, E, P>
 where
     V: 'static + Writable,
     E: 'static + Writable,
-    P: 'static + Writable,
+    P: 'static + Writable + Eq,
 {
     builder: TraversalBuilder<V, E, P>,
     terminator: TraversalTerminator<'graph, V, E, P>,
@@ -105,7 +105,7 @@ impl<'graph, V, E, P> Debug for GraphTraversal<'graph, V, E, P>
 where
     V: 'static + Writable,
     E: 'static + Writable,
-    P: 'static + Writable,
+    P: 'static + Writable + Eq,
 {
     fn fmt(&self, _f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
         todo!()
@@ -116,7 +116,7 @@ impl<'term, V, E, P> GraphTraversal<'term, V, E, P>
 where
     V: Writable,
     E: Writable,
-    P: Writable,
+    P: Writable + Eq,
 {
     pub fn new(
         builder: TraversalBuilder<V, E, P>,
@@ -132,10 +132,12 @@ where
         self.builder.bytecode()
     }
 
-    pub fn to_list(
-        &'term self,
+    pub fn to_list<'a>(
+        &'a self,
         txn: &mut RwTxn<'term>,
     ) -> <TraversalTerminator<'term, V, E, P> as Terminator<'term, PValue<V, E, P>, V, E, P>>::List
+    where
+        'term: 'a,
     {
         self.terminator.to_list(txn, self.bytecode())
     }
@@ -146,7 +148,7 @@ pub struct TraversalBuilder<V, E, P>
 where
     V: Writable,
     E: Writable,
-    P: Writable,
+    P: Writable + Eq,
 {
     pub(crate) bytecode: Bytecode<V, E, P>,
 }
@@ -155,7 +157,7 @@ impl<V, E, P> TraversalBuilder<V, E, P>
 where
     V: Writable,
     E: Writable,
-    P: Writable,
+    P: Writable + Eq,
 {
     pub fn new(bytecode: Bytecode<V, E, P>) -> Self {
         Self { bytecode }
@@ -170,7 +172,7 @@ impl<V, E, P> Default for TraversalBuilder<V, E, P>
 where
     V: Writable,
     E: Writable,
-    P: Writable,
+    P: Writable + Eq,
 {
     fn default() -> Self {
         Self {

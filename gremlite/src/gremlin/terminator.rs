@@ -11,20 +11,20 @@ where
     End: FromPValue<V, E, P>,
     V: Writable,
     E: Writable,
-    P: Writable,
+    P: Writable + Eq,
 {
     type List;
     type Next;
     type HasNext;
     type Iter;
 
-    fn to_list<'txn>(
-        &'graph self,
+    fn to_list<'a, 'txn>(
+        &'a self,
         txn: &'txn mut RwTxn<'graph>,
         traversal: &'txn Bytecode<V, E, P>,
     ) -> Self::List
     where
-        'graph: 'txn;
+        'txn: 'a;
 
     // TODO: Make these work
     // fn next<'txn, Start, Term>(
@@ -59,7 +59,7 @@ pub struct TraversalTerminator<'graph, V, E, P>
 where
     V: 'static + Writable,
     E: 'static + Writable,
-    P: 'static + Writable,
+    P: 'static + Writable + Eq,
 {
     graph: &'graph Graph<V, E, P>,
 }
@@ -68,7 +68,7 @@ impl<'graph, V, E, P> TraversalTerminator<'graph, V, E, P>
 where
     V: 'static + Writable,
     E: 'static + Writable,
-    P: 'static + Writable,
+    P: 'static + Writable + Eq,
 {
     pub fn new(graph: &'graph Graph<V, E, P>) -> Self {
         Self { graph }
@@ -80,20 +80,20 @@ where
     End: FromPValue<V, E, P>,
     V: 'static + Writable,
     E: 'static + Writable,
-    P: 'static + Writable,
+    P: 'static + Writable + Eq,
 {
     type List = Result<Vec<End>>;
     type Next = Result<End>;
     type HasNext = ();
     type Iter = ();
 
-    fn to_list<'txn>(
-        &'graph self,
+    fn to_list<'a, 'txn>(
+        &'a self,
         txn: &'txn mut RwTxn<'graph>,
         bytecode: &'txn Bytecode<V, E, P>,
     ) -> Result<Vec<End>>
     where
-        'graph: 'txn,
+        'txn: 'a,
     {
         let mut executor = WriteExecutor::<'graph, End, V, E, P>::new(self.graph);
         Ok(executor

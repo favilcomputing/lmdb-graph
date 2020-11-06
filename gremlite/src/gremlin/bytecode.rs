@@ -5,7 +5,7 @@ pub struct Bytecode<V, E, P>
 where
     V: Writable,
     E: Writable,
-    P: Writable,
+    P: Writable + Eq,
 {
     sources: Vec<Instruction<V, E, P>>,
     steps: Vec<Instruction<V, E, P>>,
@@ -15,7 +15,7 @@ impl<V, E, P> Default for Bytecode<V, E, P>
 where
     V: Writable,
     E: Writable,
-    P: Writable,
+    P: Writable + Eq,
 {
     fn default() -> Self {
         Self {
@@ -29,7 +29,7 @@ impl<V, E, P> Bytecode<V, E, P>
 where
     V: Writable,
     E: Writable,
-    P: Writable,
+    P: Writable + Eq,
 {
     // TODO: Uncomment this when it is necessary again
     // pub fn add_source(&mut self, i: Instruction<V, E, P>) {
@@ -56,7 +56,7 @@ pub enum Instruction<V, E, P>
 where
     V: Writable,
     E: Writable,
-    P: Writable,
+    P: Writable + Eq,
 {
     Vert(Vert),
     Edge(Edge),

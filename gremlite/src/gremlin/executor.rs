@@ -16,7 +16,7 @@ pub struct WriteExecutor<'graph, End, V, E, P>
 where
     V: 'static + Writable,
     E: 'static + Writable,
-    P: 'static + Writable,
+    P: 'static + Writable + Eq,
     End: FromPValue<V, E, P>,
 {
     graph: &'graph Graph<V, E, P>,
@@ -27,7 +27,7 @@ impl<'graph, End, V, E, P> WriteExecutor<'graph, End, V, E, P>
 where
     V: 'static + Writable,
     E: 'static + Writable,
-    P: 'static + Writable,
+    P: 'static + Writable + Eq,
     End: FromPValue<V, E, P>,
 {
     pub(crate) fn new(graph: &'graph Graph<V, E, P>) -> Self {
@@ -84,7 +84,7 @@ where
     I: Iterator<Item = Start>,
     V: Writable,
     E: Writable,
-    P: Writable,
+    P: Writable + Eq,
     End: FromPValue<V, E, P>,
 {
     iter: Option<I>,

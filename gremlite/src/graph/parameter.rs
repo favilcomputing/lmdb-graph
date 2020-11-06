@@ -63,7 +63,7 @@ impl<V, E, P> Default for PValue<V, E, P>
 where
     V: Writable,
     E: Writable,
-    P: Writable,
+    P: Writable + Eq,
 {
     fn default() -> Self {
         Self::None
@@ -74,7 +74,7 @@ impl<'a, V, E, P> BytesEncode<'a> for PValue<V, E, P>
 where
     V: 'a + Writable,
     E: 'a + Writable,
-    P: 'a + Writable,
+    P: 'a + Writable + Eq,
 {
     type EItem = Self;
     fn bytes_encode(item: &'a Self::EItem) -> Option<Cow<'a, [u8]>> {
@@ -86,7 +86,7 @@ impl<'a, V, E, P> BytesDecode<'a> for PValue<V, E, P>
 where
     V: 'a + Writable,
     E: 'a + Writable,
-    P: 'a + Writable,
+    P: 'a + Writable + Eq,
 {
     type DItem = Self;
     fn bytes_decode(bytes: &'a [u8]) -> Option<Self::DItem> {
@@ -98,7 +98,7 @@ pub trait FromPValue<V, E, P>: Sized
 where
     V: Writable,
     E: Writable,
-    P: Writable,
+    P: Writable + Eq,
 {
     fn from_pvalue(v: PValue<V, E, P>) -> Result<Self>;
 }
@@ -107,7 +107,7 @@ impl<V, E, P> FromPValue<V, E, P> for PValue<V, E, P>
 where
     V: Writable,
     E: Writable,
-    P: Writable,
+    P: Writable + Eq,
 {
     fn from_pvalue(v: Self) -> Result<Self> {
         Ok(v)
@@ -118,7 +118,7 @@ pub trait ToPValue<V, E, P>: Sized
 where
     V: Writable,
     E: Writable,
-    P: Writable,
+    P: Writable + Eq,
 {
     fn to_pvalue(&self) -> PValue<V, E, P>;
 }
@@ -127,7 +127,7 @@ impl<V, E, P> ToPValue<V, E, P> for PValue<V, E, P>
 where
     V: Writable,
     E: Writable,
-    P: Writable,
+    P: Writable + Eq,
 {
     fn to_pvalue(&self) -> Self {
         self.clone()
