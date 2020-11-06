@@ -411,10 +411,10 @@ mod tests {
         let (r1, r2) = graph.write_traversal(|g, mut txn| {
             let v1 = g.addV("test".into());
             let v2 = g.addV("test".into());
-            Ok((v1.to_list(&mut txn)?, v2.to_list(&mut txn)?))
+            Ok((v1.next(&mut txn)?, v2.next(&mut txn)?))
         })?;
-        let r1 = Vertex::from_pvalue(r1[0].clone())?;
-        let r2 = Vertex::from_pvalue(r2[0].clone())?;
+        let r1 = Vertex::from_pvalue(r1.clone())?;
+        let r2 = Vertex::from_pvalue(r2.clone())?;
         let mut txn = graph.write_txn().unwrap();
         let e = Edge::new(&r1, &r2, "e".into())?;
         let e = graph.put_edge(&mut txn, &e.clone()).unwrap();
