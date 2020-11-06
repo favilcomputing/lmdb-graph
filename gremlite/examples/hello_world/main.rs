@@ -58,9 +58,9 @@ fn main() -> Result<()> {
 
     let (vs, es) = graph.write_traversal(|g, mut txn| {
         let vs = g.v(());
-        let vs = vs.to_list(&mut txn)?.clone();
+        let vs = vs.to_list(&mut txn)?;
         let es = g.e(());
-        let es = es.to_list(&mut txn)?.clone();
+        let es = es.to_list(&mut txn)?;
         Ok((vs, es))
     })?;
     for v in vs {
