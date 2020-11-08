@@ -1,5 +1,5 @@
 use criterion::{black_box, criterion_group, criterion_main, BatchSize, Criterion};
-use lmdb_graph::{graph::Vertex, heed::Graph};
+use gremlite::{graph::Vertex, heed::Graph};
 use std::time::Duration;
 
 pub fn bench_vertices(c: &mut Criterion) {
@@ -7,7 +7,7 @@ pub fn bench_vertices(c: &mut Criterion) {
     let graph = Graph::<String, String, ()>::new(f.path()).unwrap();
     c.bench_function("graph add 1 vertices", |b| {
         b.iter_batched(
-            || (0..1).map(|i| Vertex::new(format!("Vertex {}", i)).unwrap()),
+            || (0..1).map(|i| Vertex::new(format!("Vertex {}", i))),
             |data| {
                 let mut txn = graph.write_txn().unwrap();
                 for vertex in data {
@@ -23,7 +23,7 @@ pub fn bench_vertices(c: &mut Criterion) {
     txn.commit().unwrap();
     c.bench_function("graph add 10 vertices", |b| {
         b.iter_batched(
-            || (0..10).map(|i| Vertex::new(format!("Vertex {}", i)).unwrap()),
+            || (0..10).map(|i| Vertex::new(format!("Vertex {}", i))),
             |data| {
                 let mut txn = graph.write_txn().unwrap();
                 for vertex in data {
@@ -39,7 +39,7 @@ pub fn bench_vertices(c: &mut Criterion) {
     txn.commit().unwrap();
     c.bench_function("graph add 100 vertices", |b| {
         b.iter_batched(
-            || (0..100).map(|i| Vertex::new(format!("Vertex {}", i)).unwrap()),
+            || (0..100).map(|i| Vertex::new(format!("Vertex {}", i))),
             |data| {
                 let mut txn = graph.write_txn().unwrap();
                 for vertex in data {
