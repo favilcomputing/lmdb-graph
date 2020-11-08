@@ -3,13 +3,14 @@ pub(crate) mod executor;
 pub(crate) mod terminator;
 
 use crate::{
-    graph::{Ids, PValue, Writable},
+    error::{Error, Result},
+    graph::{Id, Ids, PValue, Writable},
     gremlin::{bytecode::Bytecode, terminator::Terminator},
     heed::Graph,
 };
 use bytecode::Instruction;
 use heed::RwTxn;
-use std::fmt::Debug;
+use std::{convert::TryInto, fmt::Debug};
 use terminator::TraversalTerminator;
 
 pub trait TraversalSource<'graph, V, E, P>
@@ -28,8 +29,11 @@ where
         T: Into<Ids>,
         'graph: 'a;
 
-    #[allow(non_snake_case)]
-    fn addV<'a>(&'a self, label: V) -> GraphTraversal<'graph, V, E, P>
+    fn add_v<'a>(&'a self, label: V) -> GraphTraversal<'graph, V, E, P>
+    where
+        'graph: 'a;
+
+    fn add_e<'a>(&'a self, label: E) -> GraphTraversal<'graph, V, E, P>
     where
         'graph: 'a;
 }
@@ -81,12 +85,21 @@ where
         GraphTraversal::new(TraversalBuilder::new(code), self.graph.terminator())
     }
 
-    fn addV<'a>(&'a self, label: V) -> GraphTraversal<'graph, V, E, P>
+    fn add_v<'a>(&'a self, label: V) -> GraphTraversal<'graph, V, E, P>
     where
         'graph: 'a,
     {
         let mut code = Bytecode::default();
         code.add_step(Instruction::AddV(label));
+        GraphTraversal::new(TraversalBuilder::new(code), self.graph.terminator())
+    }
+
+    fn add_e<'a>(&'a self, label: E) -> GraphTraversal<'graph, V, E, P>
+    where
+        'graph: 'a,
+    {
+        let mut code = Bytecode::default();
+        code.add_step(Instruction::AddE(label));
         GraphTraversal::new(TraversalBuilder::new(code), self.graph.terminator())
     }
 }
@@ -132,6 +145,22 @@ where
         self.builder.bytecode()
     }
 
+    pub fn from<A>(mut self, id: A) -> Result<Self>
+    where
+        A: TryInto<Id, Error = Error>,
+    {
+        self.builder = self.builder.from(id)?;
+        Ok(self)
+    }
+
+    pub fn to<A>(mut self, id: A) -> Result<Self>
+    where
+        A: TryInto<Id, Error = Error>,
+    {
+        self.builder = self.builder.to(id)?;
+        Ok(self)
+    }
+
     pub fn to_list<'a>(
         &'a self,
         txn: &mut RwTxn<'term>,
@@ -173,6 +202,22 @@ where
 
     pub fn bytecode(&self) -> &Bytecode<V, E, P> {
         &self.bytecode
+    }
+
+    pub fn from<A>(mut self, id: A) -> Result<Self>
+    where
+        A: TryInto<Id, Error = crate::error::Error>,
+    {
+        self.bytecode.add_step(Instruction::From(id.try_into()?));
+        Ok(self)
+    }
+
+    pub fn to<A>(mut self, id: A) -> Result<Self>
+    where
+        A: TryInto<Id, Error = crate::error::Error>,
+    {
+        self.bytecode.add_step(Instruction::To(id.try_into()?));
+        Ok(self)
     }
 }
 

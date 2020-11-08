@@ -248,7 +248,7 @@ mod tests {
     }
 
     #[rstest]
-    fn test_mult_trans(graph: Graph<String, String, ()>) -> Result<()> {
+    fn test_mult_txn(graph: Graph<String, String, ()>) -> Result<()> {
         let _w1 = graph.write_txn()?;
         let w2 = graph.write_txn_wait(Duration::from_secs(0));
         match w2 {
@@ -260,7 +260,7 @@ mod tests {
     }
 
     #[rstest]
-    fn test_mult_trans_threads(graph: Graph<String, String, ()>) -> Result<()> {
+    fn test_mult_txn_threads(graph: Graph<String, String, ()>) -> Result<()> {
         let p1 = Parker::new();
         let u1 = p1.unparker();
 
@@ -387,7 +387,7 @@ mod tests {
 
     #[rstest]
     fn test_vertex_traversal(graph: Graph<String, String, ()>) -> Result<()> {
-        let returned = graph.write_traversal(|g, mut txn| g.addV("test".into()).next(&mut txn))?;
+        let returned = graph.write_traversal(|g, mut txn| g.add_v("test".into()).next(&mut txn))?;
         let returned = Vertex::from_pvalue(returned.clone()).unwrap();
 
         let vs = graph.write_traversal(|g, mut txn| g.v(()).to_list(&mut txn))?;
@@ -408,17 +408,13 @@ mod tests {
     #[rstest]
     fn test_edge_traversal(graph: Graph<String, String, ()>) -> Result<()> {
         // TODO: clean this crap up
-        let (r1, r2) = graph.write_traversal(|g, mut txn| {
-            let v1 = g.addV("test".into());
-            let v2 = g.addV("test".into());
-            Ok((v1.next(&mut txn)?, v2.next(&mut txn)?))
+        let (r1, r2, e) = graph.write_traversal(|g, mut txn| {
+            let v1 = g.add_v("test".into()).next(&mut txn)?;
+            let v2 = g.add_v("test".into()).next(&mut txn)?;
+            let e = g.add_e("test".into()).from(&v1)?.to(&v2)?.next(&mut txn)?;
+            Ok((v1, v2, e))
         })?;
-        let r1 = Vertex::from_pvalue(r1.clone())?;
-        let r2 = Vertex::from_pvalue(r2.clone())?;
-        let mut txn = graph.write_txn().unwrap();
-        let e = Edge::new(&r1, &r2, "e".into())?;
-        let e = graph.put_edge(&mut txn, &e.clone()).unwrap();
-        txn.commit()?;
+        let e = Edge::from_pvalue(e.clone())?;
 
         let es = graph.write_traversal(|g, mut txn| g.e(()).to_list(&mut txn))?;
         assert_eq!(es.len(), 1);

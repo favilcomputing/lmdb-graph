@@ -7,7 +7,7 @@ use super::{
 };
 use crate::error::{Error, Result};
 use heed::{BytesDecode, BytesEncode};
-use std::{borrow::Cow, clone::Clone, collections::HashMap};
+use std::{borrow::Cow, clone::Clone, collections::HashMap, convert::TryInto};
 
 #[derive(Debug, PartialEq, Clone, Copy, Serialize, Deserialize)]
 pub enum HexOrder {
@@ -67,18 +67,18 @@ where
     E: Writable,
     P: Writable + Eq,
 {
-    pub fn new(to: &Vertex<V, E, P>, from: &Vertex<V, E, P>, label: E) -> Result<Self> {
-        if to.id.is_none() || from.id.is_none() {
-            Err(Error::VertexInvalid)
-        } else {
-            Ok(Self {
-                id: None,
-                to: to.id.unwrap(),
-                from: from.id.unwrap(),
-                label,
-                parameters: Default::default(),
-            })
-        }
+    pub fn new<Err: Into<Error>, A: TryInto<Id, Error = Err>>(
+        to: A,
+        from: A,
+        label: E,
+    ) -> Result<Self> {
+        Ok(Self {
+            id: None,
+            to: to.try_into().map_err(|e| e.into())?,
+            from: from.try_into().map_err(|e| e.into())?,
+            label,
+            parameters: Default::default(),
+        })
     }
 
     pub fn get_label(&self) -> E {

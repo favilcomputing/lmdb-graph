@@ -42,15 +42,13 @@ where
     where
         'txn: 'a;
 
-    // TODO: Make these work
-    // fn iter<'txn, Start, Term>(
-    //     &self,
-    //     txn: &'txn mut RwTxn<'txn>,
-    //     traversal: &GraphTraversal<'graph, Start, End, Term, V, E, P>,
-    // ) -> Self::Iter
-    // where
-    //     'graph: 'txn,
-    //     Term: Terminator<'graph, End, V, E, P>;
+    fn iter<'a, 'txn>(
+        &'a self,
+        txn: &'txn mut RwTxn<'graph>,
+        traversal: &'txn Bytecode<V, E, P>,
+    ) -> Self::Iter
+    where
+        'txn: 'a;
 }
 
 pub struct TraversalTerminator<'graph, V, E, P>
@@ -127,15 +125,15 @@ where
         // let mut executor: WriteExecutor<'graph, End, V, E, P> = WriteExecutor::new(self.graph);
         // let iter = executor.execute(txn, traversal)?.next();
     }
-    // fn iter<'txn, Start, Term>(
-    //     &self,
-    //     _txn: &'txn mut RwTxn,
-    //     _traversal: &GraphTraversal<'graph, Start, End, Term, V, E, P>,
-    // ) -> Self::Iter
-    // where
-    //     'graph: 'txn,
-    //     Term: Terminator<'graph, End, V, E, P>,
-    // {
-    //     todo!()
-    // }
+
+    fn iter<'a, 'txn>(
+        &'a self,
+        _txn: &'txn mut RwTxn<'graph>,
+        _traversal: &'txn Bytecode<V, E, P>,
+    ) -> Self::Iter
+    where
+        'txn: 'a,
+    {
+        todo!()
+    }
 }
