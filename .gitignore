@@ -2,4 +2,6 @@
 Cargo.lock
 test.db/
 test.mdb/
+*.mdb/
 tarpaulin-report.html
+**/target/
