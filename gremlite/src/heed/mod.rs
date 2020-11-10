@@ -11,7 +11,7 @@ use tracing::instrument;
 use crate::{
     error::{Error, Result},
     graph::{parameter::PValue, Edge, Id, Vertex, Writable},
-    gremlin::{terminator::TraversalTerminator, GraphTraversalSource},
+    gremlin::{terminator::TraversalTerminator, RWTraversalSource},
 };
 
 use ulid::Generator;
@@ -101,7 +101,7 @@ pub struct Graph<V = String, E = String, P = String>
 where
     V: 'static + Writable,
     E: 'static + Writable,
-    P: 'static + Writable,
+    P: 'static + Writable + Eq,
 {
     env: Env,
     generator: Mutex<Generator>,
@@ -121,7 +121,7 @@ impl<V, E, P> Debug for Graph<V, E, P>
 where
     V: Writable,
     E: Writable,
-    P: Writable,
+    P: Writable + Eq,
 {
     fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
         f.write_str("HeedGraph")
@@ -132,7 +132,7 @@ impl<V, E, P> Graph<V, E, P>
 where
     V: 'static + Writable,
     E: 'static + Writable,
-    P: 'static + Writable,
+    P: 'static + Writable + Eq,
 {
     #[instrument]
     pub fn new<T: AsRef<Path> + Debug>(path: T) -> Result<Self> {
@@ -191,8 +191,20 @@ where
         Ok(())
     }
 
-    pub fn traversal(&self) -> GraphTraversalSource<V, E, P> {
-        GraphTraversalSource::new(self)
+    pub fn write_traversal<'graph, T, F>(&'graph self, f: F) -> Result<T>
+    where
+        F: for<'a> FnOnce(
+            &'a RWTraversalSource<'graph, V, E, P>,
+            &'a mut RwTxn<'graph>,
+        ) -> Result<T>,
+    {
+        let g = RWTraversalSource::new(self);
+        let mut txn = self.write_txn()?;
+        let result = (f)(&g, &mut txn);
+        if result.is_ok() {
+            txn.commit()?;
+        }
+        result
     }
 
     pub(crate) fn terminator(&self) -> TraversalTerminator<V, E, P> {
@@ -236,7 +248,7 @@ mod tests {
     }
 
     #[rstest]
-    fn test_mult_trans(graph: Graph<String, String, ()>) -> Result<()> {
+    fn test_mult_txn(graph: Graph<String, String, ()>) -> Result<()> {
         let _w1 = graph.write_txn()?;
         let w2 = graph.write_txn_wait(Duration::from_secs(0));
         match w2 {
@@ -248,7 +260,7 @@ mod tests {
     }
 
     #[rstest]
-    fn test_mult_trans_threads(graph: Graph<String, String, ()>) -> Result<()> {
+    fn test_mult_txn_threads(graph: Graph<String, String, ()>) -> Result<()> {
         let p1 = Parker::new();
         let u1 = p1.unparker();
 
@@ -375,38 +387,19 @@ mod tests {
 
     #[rstest]
     fn test_vertex_traversal(graph: Graph<String, String, ()>) -> Result<()> {
-        // TODO: Ugh, messy
-        let returned = {
-            let g = graph.traversal();
-            let mut txn = graph.write_txn().unwrap();
-            let v = g.addV("test".into());
-            let returned = v.to_list(&mut txn).unwrap().clone();
-            txn.commit()?;
-            returned
-        };
-        let returned = Vertex::from_pvalue(returned[0].clone()).unwrap();
+        let returned = graph.write_traversal(|g, mut txn| g.add_v("test".into()).next(&mut txn))?;
+        let returned = Vertex::from_pvalue(returned.clone()).unwrap();
 
-        let vs = {
-            let g = graph.traversal();
-            let mut txn = graph.write_txn()?;
-            g.v(()).to_list(&mut txn).unwrap()
-        };
+        let vs = graph.write_traversal(|g, mut txn| g.v(()).to_list(&mut txn))?;
         assert_eq!(vs.len(), 1);
         assert_eq!(vs[0], returned.to_pvalue());
 
-        let vs = {
-            let g = graph.traversal();
-            let mut txn = graph.write_txn()?;
-            g.v(returned.id.unwrap()).to_list(&mut txn).unwrap()
-        };
+        let vs = graph.write_traversal(|g, mut txn| g.v(returned.id.unwrap()).to_list(&mut txn))?;
         assert_eq!(vs.len(), 1);
         assert_eq!(vs[0], returned.to_pvalue());
 
-        let vs = {
-            let g = graph.traversal();
-            let mut txn = graph.write_txn()?;
-            g.v(Id::nil(Type::Vertex)).to_list(&mut txn).unwrap()
-        };
+        let vs =
+            graph.write_traversal(|g, mut txn| g.v(Id::nil(Type::Vertex)).to_list(&mut txn))?;
         assert_eq!(vs.len(), 0);
 
         Ok(())
@@ -414,36 +407,25 @@ mod tests {
 
     #[rstest]
     fn test_edge_traversal(graph: Graph<String, String, ()>) -> Result<()> {
-        let v1 = Vertex::new("test".to_string());
-        let v2 = Vertex::new("test".to_string());
-        let mut txn = graph.write_txn().unwrap();
-        let r1 = graph.put_vertex(&mut txn, &v1.clone()).unwrap();
-        let r2 = graph.put_vertex(&mut txn, &v2.clone()).unwrap();
-        let e = Edge::new(&r1, &r2, "e".into())?;
-        let e = graph.put_edge(&mut txn, &e.clone()).unwrap();
-        txn.commit()?;
+        // TODO: clean this crap up
+        let e = graph.write_traversal(|g, mut txn| {
+            let v1 = g.add_v("test".into()).next(&mut txn)?;
+            let v2 = g.add_v("test".into()).next(&mut txn)?;
+            let e = g.add_e("test".into()).from(&v1)?.to(&v2)?.next(&mut txn)?;
+            Ok(e)
+        })?;
+        let e = Edge::from_pvalue(e.clone())?;
 
-        let es = {
-            let g = graph.traversal();
-            let mut txn = graph.write_txn()?;
-            g.e(()).to_list(&mut txn).unwrap()
-        };
+        let es = graph.write_traversal(|g, mut txn| g.e(()).to_list(&mut txn))?;
         assert_eq!(es.len(), 1);
         assert_eq!(es[0], e.to_pvalue());
 
-        let es = {
-            let g = graph.traversal();
-            let mut txn = graph.write_txn()?;
-            g.e(e.id.unwrap()).to_list(&mut txn).unwrap()
-        };
+        let es = graph.write_traversal(|g, mut txn| g.e(e.id.unwrap()).to_list(&mut txn))?;
         assert_eq!(es.len(), 1);
         assert_eq!(es[0], e.to_pvalue());
 
-        let es = {
-            let g = graph.traversal();
-            let mut txn = graph.write_txn()?;
-            g.e(Id::nil(Type::Vertex)).to_list(&mut txn).unwrap()
-        };
+        let es =
+            graph.write_traversal(|g, mut txn| g.e(Id::nil(Type::Vertex)).to_list(&mut txn))?;
         assert_eq!(es.len(), 0);
 
         Ok(())

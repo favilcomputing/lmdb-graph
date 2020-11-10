@@ -3,11 +3,11 @@ use serde::{de::DeserializeOwned, Deserialize, Serialize};
 
 use super::{
     parameter::{FromPValue, PValue, ToPValue},
-    Id, Vertex, Writable,
+    Id, Writable,
 };
 use crate::error::{Error, Result};
 use heed::{BytesDecode, BytesEncode};
-use std::{borrow::Cow, clone::Clone, collections::HashMap};
+use std::{borrow::Cow, clone::Clone, collections::HashMap, convert::TryInto};
 
 #[derive(Debug, PartialEq, Clone, Copy, Serialize, Deserialize)]
 pub enum HexOrder {
@@ -65,24 +65,20 @@ impl<V, E, P> Edge<V, E, P>
 where
     V: Writable,
     E: Writable,
-    P: Writable,
+    P: Writable + Eq,
 {
-    pub fn new(to: &Vertex<V, E, P>, from: &Vertex<V, E, P>, label: E) -> Result<Self>
-    where
-        V: Writable,
-        P: Writable,
-    {
-        if to.id.is_none() || from.id.is_none() {
-            Err(Error::VertexInvalid)
-        } else {
-            Ok(Self {
-                id: None,
-                to: to.id.unwrap(),
-                from: from.id.unwrap(),
-                label,
-                parameters: Default::default(),
-            })
-        }
+    pub fn new<Err: Into<Error>, A: TryInto<Id, Error = Err>>(
+        to: A,
+        from: A,
+        label: E,
+    ) -> Result<Self> {
+        Ok(Self {
+            id: None,
+            to: to.try_into().map_err(|e| e.into())?,
+            from: from.try_into().map_err(|e| e.into())?,
+            label,
+            parameters: Default::default(),
+        })
     }
 
     pub fn get_label(&self) -> E {
@@ -94,7 +90,7 @@ impl<V, E, P> FromPValue<V, E, P> for Edge<V, E, P>
 where
     V: 'static + Writable,
     E: 'static + Writable,
-    P: 'static + Writable,
+    P: 'static + Writable + Eq,
 {
     fn from_pvalue(v: PValue<V, E, P>) -> Result<Self> {
         match v {
@@ -108,7 +104,7 @@ impl<V, E, P> ToPValue<V, E, P> for Edge<V, E, P>
 where
     V: 'static + Writable,
     E: 'static + Writable,
-    P: 'static + Writable,
+    P: 'static + Writable + Eq,
 {
     fn to_pvalue(&self) -> PValue<V, E, P> {
         PValue::Edge(self.clone())
@@ -119,7 +115,7 @@ impl<'a, V, E, P> BytesEncode<'a> for Edge<V, E, P>
 where
     V: 'a + Writable,
     E: 'a + Writable,
-    P: 'a + Writable,
+    P: 'a + Writable + Eq,
 {
     type EItem = Self;
 
@@ -135,7 +131,7 @@ impl<'a, V, E, P> BytesDecode<'a> for Edge<V, E, P>
 where
     V: 'a + Writable,
     E: 'a + Writable,
-    P: 'a + Writable,
+    P: 'a + Writable + Eq,
 {
     type DItem = Self;
 
@@ -149,7 +145,7 @@ mod tests {
     use rstest::rstest;
 
     use super::*;
-    use crate::graph::Type;
+    use crate::graph::{Type, Vertex};
 
     #[rstest]
     fn test_none_id() -> Result<()> {

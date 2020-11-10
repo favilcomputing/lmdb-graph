@@ -14,21 +14,18 @@ enum VertexType {
     Name(String),
 }
 
-impl Writable for VertexType {}
-
 #[derive(Serialize, Deserialize, Clone, Debug, EnumString, Eq, PartialEq, Hash)]
 enum EdgeType {
     Sibling,
 }
 
-impl Writable for EdgeType {}
-
 #[allow(unused_mut)]
 fn main() -> Result<()> {
     env_logger::init();
 
-    log::info!("Setting up graph");
+    log::info!("Creating directory");
     fs::create_dir_all("test.mdb")?;
+    log::info!("Setting up graph");
     let graph = Graph::<_, _, String>::new("test.mdb")?;
     let mut txn = graph.write_txn()?;
     let n = graph.get_vertex_by_label(&txn, &VertexType::Name("Phineas".to_string()))?;
@@ -56,16 +53,11 @@ fn main() -> Result<()> {
 
     txn.commit()?;
 
-    let (vs, es) = {
-        let mut txn = graph.write_txn()?;
-        let g = graph.traversal();
-
-        let vs = g.v(());
-        let vs = vs.to_list(&mut txn)?;
-        let es = g.e(());
-        let es = es.to_list(&mut txn)?;
-        (vs, es)
-    };
+    let (vs, es) = graph.write_traversal(|g, mut txn| {
+        let vs = g.v(()).to_list(&mut txn)?;
+        let es = g.e(()).to_list(&mut txn)?;
+        Ok((vs, es))
+    })?;
     for v in vs {
         log::info!("Found vertex: {:#?}", v);
     }

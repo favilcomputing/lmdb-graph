@@ -5,16 +5,24 @@ pub(crate) mod vertex;
 use serde::{de::DeserializeOwned, Deserialize, Serialize};
 use ulid::{Generator, Ulid};
 
-pub use self::{edge::Edge, parameter::PValue, vertex::Vertex};
-use crate::error::Result;
+pub use self::{
+    edge::Edge,
+    parameter::{FromPValue, PValue, ToPValue},
+    vertex::Vertex,
+};
+use crate::error::{Error, Result};
 use heed::{BytesDecode, BytesEncode};
 use postcard::{from_bytes, to_stdvec};
-use std::{borrow::Cow, convert::TryInto, fmt::Debug, hash::Hash};
+use std::{
+    borrow::Cow,
+    convert::{TryFrom, TryInto},
+    fmt::Debug,
+    hash::Hash,
+};
 
-pub trait Writable: Serialize + DeserializeOwned + Clone + Hash + Debug + PartialEq + Eq {}
+pub trait Writable: Serialize + DeserializeOwned + Clone + Hash + Debug + PartialEq {}
 
-impl Writable for () {}
-impl Writable for String {}
+impl<T: Serialize + DeserializeOwned + Clone + Hash + Debug + PartialEq> Writable for T {}
 
 #[derive(Serialize, Deserialize, PartialEq, PartialOrd, Clone, Copy, Eq, Ord, Hash, Debug)]
 pub enum Type {
@@ -64,6 +72,37 @@ impl<T: Into<Id>> From<T> for Ids {
 impl<T: Into<Id>> From<Vec<T>> for Ids {
     fn from(i: Vec<T>) -> Self {
         Self(i.into_iter().map(Into::into).collect())
+    }
+}
+
+impl<V, E, P> TryFrom<&Vertex<V, E, P>> for Id
+where
+    V: Writable,
+    E: Writable,
+    P: Writable + Eq,
+{
+    type Error = Error;
+
+    fn try_from(v: &Vertex<V, E, P>) -> Result<Self> {
+        v.id.ok_or(Error::VertexInvalid)
+    }
+}
+
+impl<V, E, P> TryFrom<&PValue<V, E, P>> for Id
+where
+    V: Writable,
+    E: Writable,
+    P: Writable + Eq,
+{
+    type Error = Error;
+
+    fn try_from(v: &PValue<V, E, P>) -> Result<Self> {
+        match v {
+            PValue::Vertex(v) => v.id.ok_or(Error::VertexInvalid),
+            PValue::Edge(e) => e.id.ok_or(Error::EdgeInvalid),
+            PValue::Id(id) => Ok(*id),
+            _ => Err(Error::InvalidPValue("Type doesn't have id".into())),
+        }
     }
 }
 

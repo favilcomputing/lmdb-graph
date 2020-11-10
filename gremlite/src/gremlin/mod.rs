@@ -3,20 +3,21 @@ pub(crate) mod executor;
 pub(crate) mod terminator;
 
 use crate::{
-    graph::{Ids, PValue, Writable},
+    error::{Error, Result},
+    graph::{Id, Ids, PValue, Writable},
     gremlin::{bytecode::Bytecode, terminator::Terminator},
     heed::Graph,
 };
 use bytecode::Instruction;
 use heed::RwTxn;
-use std::fmt::Debug;
+use std::{convert::TryInto, fmt::Debug};
 use terminator::TraversalTerminator;
 
 pub trait TraversalSource<'graph, V, E, P>
 where
     V: 'static + Writable,
     E: 'static + Writable,
-    P: 'static + Writable,
+    P: 'static + Writable + Eq,
 {
     fn v<'a, T>(&'a self, ids: T) -> GraphTraversal<'graph, V, E, P>
     where
@@ -28,38 +29,41 @@ where
         T: Into<Ids>,
         'graph: 'a;
 
-    #[allow(non_snake_case)]
-    fn addV<'a>(&'a self, label: V) -> GraphTraversal<'graph, V, E, P>
+    fn add_v<'a>(&'a self, label: V) -> GraphTraversal<'graph, V, E, P>
+    where
+        'graph: 'a;
+
+    fn add_e<'a>(&'a self, label: E) -> GraphTraversal<'graph, V, E, P>
     where
         'graph: 'a;
 }
 
 #[derive(Clone)]
-pub struct GraphTraversalSource<'graph, V, E, P>
+pub struct RWTraversalSource<'graph, V, E, P>
 where
     V: 'static + Writable,
     E: 'static + Writable,
-    P: 'static + Writable,
+    P: 'static + Writable + Eq,
 {
     graph: &'graph Graph<V, E, P>,
 }
 
-impl<'graph, V, E, P> GraphTraversalSource<'graph, V, E, P>
+impl<'graph, V, E, P> RWTraversalSource<'graph, V, E, P>
 where
     V: 'static + Writable,
     E: 'static + Writable,
-    P: 'static + Writable,
+    P: 'static + Writable + Eq,
 {
     pub fn new(graph: &'graph Graph<V, E, P>) -> Self {
         Self { graph }
     }
 }
 
-impl<'graph, V, E, P> TraversalSource<'graph, V, E, P> for GraphTraversalSource<'graph, V, E, P>
+impl<'graph, V, E, P> TraversalSource<'graph, V, E, P> for RWTraversalSource<'graph, V, E, P>
 where
     V: 'static + Writable,
     E: 'static + Writable,
-    P: 'static + Writable,
+    P: 'static + Writable + Eq,
 {
     fn v<'a, T>(&'a self, ids: T) -> GraphTraversal<'graph, V, E, P>
     where
@@ -81,12 +85,21 @@ where
         GraphTraversal::new(TraversalBuilder::new(code), self.graph.terminator())
     }
 
-    fn addV<'a>(&'a self, label: V) -> GraphTraversal<'graph, V, E, P>
+    fn add_v<'a>(&'a self, label: V) -> GraphTraversal<'graph, V, E, P>
     where
         'graph: 'a,
     {
         let mut code = Bytecode::default();
         code.add_step(Instruction::AddV(label));
+        GraphTraversal::new(TraversalBuilder::new(code), self.graph.terminator())
+    }
+
+    fn add_e<'a>(&'a self, label: E) -> GraphTraversal<'graph, V, E, P>
+    where
+        'graph: 'a,
+    {
+        let mut code = Bytecode::default();
+        code.add_step(Instruction::AddE(label));
         GraphTraversal::new(TraversalBuilder::new(code), self.graph.terminator())
     }
 }
@@ -95,7 +108,7 @@ pub struct GraphTraversal<'graph, V, E, P>
 where
     V: 'static + Writable,
     E: 'static + Writable,
-    P: 'static + Writable,
+    P: 'static + Writable + Eq,
 {
     builder: TraversalBuilder<V, E, P>,
     terminator: TraversalTerminator<'graph, V, E, P>,
@@ -105,7 +118,7 @@ impl<'graph, V, E, P> Debug for GraphTraversal<'graph, V, E, P>
 where
     V: 'static + Writable,
     E: 'static + Writable,
-    P: 'static + Writable,
+    P: 'static + Writable + Eq,
 {
     fn fmt(&self, _f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
         todo!()
@@ -116,7 +129,7 @@ impl<'term, V, E, P> GraphTraversal<'term, V, E, P>
 where
     V: Writable,
     E: Writable,
-    P: Writable,
+    P: Writable + Eq,
 {
     pub fn new(
         builder: TraversalBuilder<V, E, P>,
@@ -132,12 +145,38 @@ where
         self.builder.bytecode()
     }
 
-    pub fn to_list(
-        &'term self,
+    pub fn from<A>(mut self, id: A) -> Result<Self>
+    where
+        A: TryInto<Id, Error = Error>,
+    {
+        self.builder = self.builder.from(id)?;
+        Ok(self)
+    }
+
+    pub fn to<A>(mut self, id: A) -> Result<Self>
+    where
+        A: TryInto<Id, Error = Error>,
+    {
+        self.builder = self.builder.to(id)?;
+        Ok(self)
+    }
+
+    pub fn to_list<'a>(
+        &'a self,
         txn: &mut RwTxn<'term>,
     ) -> <TraversalTerminator<'term, V, E, P> as Terminator<'term, PValue<V, E, P>, V, E, P>>::List
+    where
+        'term: 'a,
     {
         self.terminator.to_list(txn, self.bytecode())
+    }
+
+    pub fn next<'a>(
+        &'a self,
+        txn: &mut RwTxn<'term>,
+    ) -> <TraversalTerminator<'term, V, E, P> as Terminator<'term, PValue<V, E, P>, V, E, P>>::Next
+    {
+        self.terminator.next(txn, self.bytecode())
     }
 }
 
@@ -146,7 +185,7 @@ pub struct TraversalBuilder<V, E, P>
 where
     V: Writable,
     E: Writable,
-    P: Writable,
+    P: Writable + Eq,
 {
     pub(crate) bytecode: Bytecode<V, E, P>,
 }
@@ -155,7 +194,7 @@ impl<V, E, P> TraversalBuilder<V, E, P>
 where
     V: Writable,
     E: Writable,
-    P: Writable,
+    P: Writable + Eq,
 {
     pub fn new(bytecode: Bytecode<V, E, P>) -> Self {
         Self { bytecode }
@@ -164,13 +203,29 @@ where
     pub fn bytecode(&self) -> &Bytecode<V, E, P> {
         &self.bytecode
     }
+
+    pub fn from<A>(mut self, id: A) -> Result<Self>
+    where
+        A: TryInto<Id, Error = crate::error::Error>,
+    {
+        self.bytecode.add_step(Instruction::From(id.try_into()?));
+        Ok(self)
+    }
+
+    pub fn to<A>(mut self, id: A) -> Result<Self>
+    where
+        A: TryInto<Id, Error = crate::error::Error>,
+    {
+        self.bytecode.add_step(Instruction::To(id.try_into()?));
+        Ok(self)
+    }
 }
 
 impl<V, E, P> Default for TraversalBuilder<V, E, P>
 where
     V: Writable,
     E: Writable,
-    P: Writable,
+    P: Writable + Eq,
 {
     fn default() -> Self {
         Self {

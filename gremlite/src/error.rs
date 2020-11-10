@@ -1,7 +1,7 @@
 use ulid::DecodeError;
 
 use std::io;
-use std::{result, time::Duration};
+use std::{convert::Infallible, result, time::Duration};
 
 use crate::graph::Id;
 
@@ -18,6 +18,9 @@ pub enum Error {
 
     #[error("invalid vertex")]
     VertexInvalid,
+
+    #[error("invalid edge")]
+    EdgeInvalid,
 
     #[error("empty traversal")]
     EmptyTraversal,
@@ -40,6 +43,9 @@ pub enum Error {
     #[error("bad write")]
     BadWrite,
 
+    #[error("bad request")]
+    BadRequest(&'static str),
+
     #[error("timed out waiting for transaction {0:?}")]
     TimedOut(Duration),
 
@@ -48,6 +54,9 @@ pub enum Error {
 
     #[error("Invalid PValue {0}")]
     InvalidPValue(String),
+
+    #[error("infallible")]
+    Infallible(#[from] Infallible),
 }
 
 impl From<ulid::MonotonicError> for Error {

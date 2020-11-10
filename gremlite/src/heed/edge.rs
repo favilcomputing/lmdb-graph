@@ -12,7 +12,7 @@ impl<V, E, P> Graph<V, E, P>
 where
     V: Writable,
     E: Writable,
-    P: Writable,
+    P: Writable + Eq,
 {
     pub fn put_edge(&self, txn: &mut RwTxn, edge: &Edge<V, E, P>) -> Result<Edge<V, E, P>> {
         let e = if edge.id.is_some() {
@@ -109,7 +109,7 @@ pub struct EdgeIter<'txn, V, E, P>
 where
     V: 'static + Writable,
     E: 'static + Writable,
-    P: 'static + Writable,
+    P: 'static + Writable + Eq,
 {
     pub(crate) iter: RoIter<'txn, Id, Edge<V, E, P>>,
 }
@@ -118,7 +118,7 @@ impl<'txn, V, E, P> Iterator for EdgeIter<'txn, V, E, P>
 where
     V: 'static + Writable,
     E: 'static + Writable,
-    P: 'static + Writable,
+    P: 'static + Writable + Eq,
 {
     type Item = PValue<V, E, P>;
 
@@ -136,7 +136,7 @@ pub struct EdgeRange<'txn, V, E, P>
 where
     V: 'static + Writable,
     E: 'static + Writable,
-    P: 'static + Writable,
+    P: 'static + Writable + Eq,
 {
     pub(crate) iter: RoRange<'txn, LabelId<E>, Id>,
     graph: &'txn Graph<V, E, P>,
@@ -148,7 +148,7 @@ impl<'txn, V, E, P> Iterator for EdgeRange<'txn, V, E, P>
 where
     V: 'txn + Writable,
     E: 'txn + Writable,
-    P: 'txn + Writable,
+    P: 'txn + Writable + Eq,
 {
     type Item = Edge<V, E, P>;
 
@@ -166,7 +166,7 @@ impl<'txn, V, E, P> EdgeRange<'txn, V, E, P>
 where
     V: Writable,
     E: Writable,
-    P: Writable,
+    P: Writable + Eq,
 {
     pub fn new(
         graph: &'txn Graph<V, E, P>,

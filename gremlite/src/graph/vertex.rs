@@ -28,7 +28,7 @@ impl<V, E, P> Vertex<V, E, P>
 where
     V: Writable,
     E: Writable,
-    P: Writable,
+    P: Writable + Eq,
 {
     pub fn new(label: V) -> Self {
         Self {
@@ -57,7 +57,7 @@ impl<'a, V, E, P> BytesEncode<'a> for Vertex<V, E, P>
 where
     V: 'a + Writable,
     E: 'a + Writable,
-    P: 'a + Writable,
+    P: 'a + Writable + Eq,
 {
     type EItem = Self;
 
@@ -73,7 +73,7 @@ impl<'a, V, E, P> BytesDecode<'a> for Vertex<V, E, P>
 where
     V: 'a + Writable,
     E: 'a + Writable,
-    P: 'a + Writable,
+    P: 'a + Writable + Eq,
 {
     type DItem = Self;
 
@@ -86,7 +86,7 @@ impl<V, E, P> FromPValue<V, E, P> for Vertex<V, E, P>
 where
     V: 'static + Writable,
     E: 'static + Writable,
-    P: 'static + Writable,
+    P: 'static + Writable + Eq,
 {
     fn from_pvalue(v: PValue<V, E, P>) -> Result<Self> {
         match v {
@@ -100,7 +100,7 @@ impl<V, E, P> ToPValue<V, E, P> for Vertex<V, E, P>
 where
     V: 'static + Writable,
     E: 'static + Writable,
-    P: 'static + Writable,
+    P: 'static + Writable + Eq,
 {
     fn to_pvalue(&self) -> PValue<V, E, P> {
         PValue::Vertex(self.clone())
