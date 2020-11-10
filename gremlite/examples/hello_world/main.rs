@@ -14,14 +14,10 @@ enum VertexType {
     Name(String),
 }
 
-impl Writable for VertexType {}
-
 #[derive(Serialize, Deserialize, Clone, Debug, EnumString, Eq, PartialEq, Hash)]
 enum EdgeType {
     Sibling,
 }
-
-impl Writable for EdgeType {}
 
 #[allow(unused_mut)]
 fn main() -> Result<()> {

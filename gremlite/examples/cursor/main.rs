@@ -14,21 +14,15 @@ enum VertexType {
     Person,
 }
 
-impl Writable for VertexType {}
-
 #[derive(Serialize, Deserialize, Clone, Debug, EnumString, Eq, PartialEq, Hash)]
 enum EdgeType {
     Brother,
 }
 
-impl Writable for EdgeType {}
-
 #[derive(Serialize, Deserialize, Clone, Debug, EnumString, Eq, PartialEq, Hash)]
 enum ParameterType {
     Name,
 }
-
-impl Writable for ParameterType {}
 
 fn main() -> Result<()> {
     env_logger::init();

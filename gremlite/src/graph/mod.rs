@@ -22,12 +22,7 @@ use std::{
 
 pub trait Writable: Serialize + DeserializeOwned + Clone + Hash + Debug + PartialEq {}
 
-impl Writable for () {}
-impl Writable for String {}
-// impl<V: Writable, E: Writable, P: Writable + Eq> Writable for PValue<V, E, P> {}
-
-impl<T: Writable> Writable for Vec<T> {}
-impl<T: Writable, U: Writable> Writable for (T, U) {}
+impl<T: Serialize + DeserializeOwned + Clone + Hash + Debug + PartialEq> Writable for T {}
 
 #[derive(Serialize, Deserialize, PartialEq, PartialOrd, Clone, Copy, Eq, Ord, Hash, Debug)]
 pub enum Type {
