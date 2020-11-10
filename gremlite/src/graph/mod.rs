@@ -100,7 +100,7 @@ where
         match v {
             PValue::Vertex(v) => v.id.ok_or(Error::VertexInvalid),
             PValue::Edge(e) => e.id.ok_or(Error::EdgeInvalid),
-            PValue::Id(id) => Ok(id.clone()),
+            PValue::Id(id) => Ok(*id),
             _ => Err(Error::InvalidPValue("Type doesn't have id".into())),
         }
     }

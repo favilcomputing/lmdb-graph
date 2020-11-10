@@ -145,7 +145,7 @@ mod tests {
     use rstest::rstest;
 
     use super::*;
-    use crate::graph::{Vertex, Type};
+    use crate::graph::{Type, Vertex};
 
     #[rstest]
     fn test_none_id() -> Result<()> {

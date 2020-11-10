@@ -85,14 +85,14 @@ where
     fn pop_to_from(steps: &mut VecDeque<Instruction<V, E, P>>) -> Result<(Id, Id)> {
         let (mut to, mut from) = (None, None);
         let mut dels = vec![];
-        for idx in 0..steps.len() {
-            match steps[idx] {
+        for (idx, step) in steps.iter().enumerate() {
+            match step {
                 Instruction::From(id) => {
-                    from = Some(id);
+                    from = Some(*id);
                     dels.push(idx);
                 }
                 Instruction::To(id) => {
-                    to = Some(id);
+                    to = Some(*id);
                     dels.push(idx);
                 }
                 _ => {
