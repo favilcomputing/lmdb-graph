@@ -1,6 +1,6 @@
 use gremlite::{
     error::Result,
-    graph::{Edge, PValue, Vertex, Writable},
+    graph::{Edge, PValue, Vertex},
     heed::Graph,
 };
 #[allow(unused_imports)]

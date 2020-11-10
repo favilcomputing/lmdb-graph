@@ -408,11 +408,11 @@ mod tests {
     #[rstest]
     fn test_edge_traversal(graph: Graph<String, String, ()>) -> Result<()> {
         // TODO: clean this crap up
-        let (r1, r2, e) = graph.write_traversal(|g, mut txn| {
+        let e = graph.write_traversal(|g, mut txn| {
             let v1 = g.add_v("test".into()).next(&mut txn)?;
             let v2 = g.add_v("test".into()).next(&mut txn)?;
             let e = g.add_e("test".into()).from(&v1)?.to(&v2)?.next(&mut txn)?;
-            Ok((v1, v2, e))
+            Ok(e)
         })?;
         let e = Edge::from_pvalue(e.clone())?;
 

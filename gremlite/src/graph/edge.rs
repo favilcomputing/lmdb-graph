@@ -3,7 +3,7 @@ use serde::{de::DeserializeOwned, Deserialize, Serialize};
 
 use super::{
     parameter::{FromPValue, PValue, ToPValue},
-    Id, Vertex, Writable,
+    Id, Writable,
 };
 use crate::error::{Error, Result};
 use heed::{BytesDecode, BytesEncode};
@@ -145,7 +145,7 @@ mod tests {
     use rstest::rstest;
 
     use super::*;
-    use crate::graph::Type;
+    use crate::graph::{Vertex, Type};
 
     #[rstest]
     fn test_none_id() -> Result<()> {
